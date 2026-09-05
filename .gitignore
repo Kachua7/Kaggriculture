@@ -1,0 +1,24 @@
+# build / cache
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+
+# calibration output: the real engine's source is Kaggle's, not ours to vendor
+calibration/real_engine/
+calibration/truth.json
+calibration/versions.txt
+
+# eval + sweep output
+artifacts/
+*.json.gz
+replay*.json
+submission.tar.gz
+
+# secrets
+kaggle.json
+.env
+
+# stray probe files from sandbox setup — safe to delete by hand
+.writetest
+.gittest/
