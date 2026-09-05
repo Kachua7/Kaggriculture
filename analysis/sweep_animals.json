@@ -1,0 +1,32 @@
+{
+  "params": {
+    "n_animals": 2
+  },
+  "mean": 86608.63888888889,
+  "p10": 76949.0,
+  "seeds": 48,
+  "opps": "starter,heuristic,random",
+  "holdout": [
+    [
+      "incumbent",
+      [
+        86984.05555555556,
+        77359.0
+      ]
+    ],
+    [
+      "n_animals = 2",
+      [
+        87852.54861111111,
+        78228.0
+      ]
+    ],
+    [
+      "all changes together",
+      [
+        87852.54861111111,
+        78228.0
+      ]
+    ]
+  ]
+}

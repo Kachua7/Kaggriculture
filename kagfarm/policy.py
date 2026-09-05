@@ -65,6 +65,21 @@ PARAMS = dict(
     # The ceiling binds again now that tomato is gone -- with five crops it never did, which is
     # why this was 100.0 and inert. On 144 episodes 3.0 is +$284 mean, +$688 p10, +$668 min:
     # small, but the only candidate out of a fifteen-axis sweep that improved all three.
+    #
+    # Re-swept 2026-09-05 after a probe showed days 1-9 run 24 of the starting quadrant's 25
+    # tiles as MELON -- the one crop in no shop basket, whose only buyer is the town centre's
+    # 2/day. That looked like the next big win and it is not one. The opening monoculture is
+    # load-bearing:
+    #
+    #     mix_cap   0.6 -> $26,677     1.0 -> $30,618     1.5 -> $87,143
+    #               2.0 -> $86,777     3.0 -> $86,476   100.0 -> $86,816
+    #
+    # Capping melon to 8.7 opening tiles (1.0) costs FIFTY-SIX THOUSAND DOLLARS. Melon is what
+    # funds the strawberry board; nothing else pays before day 12. Every cell from 1.5 up is
+    # within noise of every other, holdout included (1.5 is +$458 mean on unseen seeds), so the
+    # incumbent stays. The 76.8%-of-base melon price is not a bug to fix, it is the price of the
+    # opening -- and once the land unlocks on day 11 the marginal allocator drops melon to under
+    # 8 tiles on its own, exactly as `marginal_rank` claims it should. This axis is closed.
     mix_cap=3.0,               # per-crop acreage ceiling, as a multiple of its share of the mix
     max_hands=10,            # roster cap. The 13th hand costs $233/day, the 18th $2,584.
                              # Was 8, where every larger roster measured as a loss -- because
@@ -143,18 +158,32 @@ PARAMS = dict(
     # measured mean of $110, so each collection visit is worth $110 -- the best rate on the
     # board, and the reason the count is 3: three animals collect 87 doses and the credit
     # collapses to the product-only rate ($76/visit on a cow) once the fertilizer bill is gone.
-    # OFF, measured. The per-visit case for livestock is real and it still does not pay on the
-    # panel. Best variant (one animal, feed held, collection bidding against the plantings on
-    # value) scores mean $88,210 / p10 $50,148 against $87,597 / $50,687 crop-only over 48
-    # episodes: +$613 on the mean, -$539 on the p10, inside the noise either way. Two animals is
-    # -$900 on the mean, three -$1,700, four -$2,500, and the slope has a cause -- the fertilizer
-    # bill is only 97 doses a season, so the second animal's stream is already unsold surplus,
-    # and each one adds shed pressure (`lost` 5.0 -> 10.7 -> 14.0 items destroyed) on a board
-    # where the discarded item is a $110 strawberry. Left in the code, parameterized and probed,
-    # because the answer turns on the fertilizer bill and the roster size, and both move. Turn it
-    # on again only against a measurement, and only after the real engine confirms
-    # `_refresh_animal`'s unconditional daily dose -- the whole case rests on that one line.
-    n_animals=0,
+    # ON at one animal, measured 2026-09-05 on three DISJOINT 144-episode panels. The old note
+    # here said "off, measured" on the strength of a 48-episode panel taken before the engine
+    # calibration; re-run after it, one animal improves every metric on every block:
+    #
+    #     seeds     n=0 mean    n=1 mean    d_mean   d_p10    d_min   lost 0 -> 1
+    #       0-47     $85,852     $86,575      +723    +728   +1,300   16.1 -> 12.2
+    #      48-95     $86,984     $87,810      +826  +1,265   +1,836   13.4 ->  8.7
+    #     96-143     $86,730     $87,651      +921  +1,108     +629   10.8 ->  9.0
+    #
+    # Three blocks agreeing in sign on mean, p10, min AND spoilage is the strongest signal this
+    # harness can produce; ~+$820 is under the $1k standard error on any one panel, which is
+    # exactly why it took three. TWO animals is not adoptable and the contrast is the useful
+    # part: +$757, +$868, then -$391. It fails the same way the old 48-episode reading did, and
+    # for the reason already written below -- the fertilizer bill is only ~97 doses a season, so
+    # the second animal's stream is largely unsold surplus that still costs shed slots.
+    #
+    # The `lost` column is the surprise. An animal REDUCES spoilage, which was not the case made
+    # for it: the collection visit routes a hand past the shed more often, so bags get banked
+    # before the day-27 wave. It is the same mechanism as the haul discipline above, arrived at
+    # from the other direction.
+    #
+    # One caveat stands, and it is the one `bash bootstrap.sh` settles: the whole case rests on
+    # `_refresh_animal` setting `fertilizer_available` daily and unconditionally, which is a
+    # MIRROR fact. If the real engine gates that dose the gain shrinks. Bounded downside (~$800)
+    # against a consistent p10 gain, so it goes in now and gets re-checked against real source.
+    n_animals=1,
     # A structure has to beat this many dollars per visit to be worth building, judged against
     # the crop it displaces. Melon realizes $81 a visit, which is the number to beat -- but the
     # rank is computed from the shop list as it stands, and on day 0 no shop has opened yet, so

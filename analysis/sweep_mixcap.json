@@ -1,0 +1,32 @@
+{
+  "params": {
+    "mix_cap": 1.5
+  },
+  "mean": 87143.3125,
+  "p10": 73715.0,
+  "seeds": 16,
+  "opps": "starter,heuristic,random",
+  "holdout": [
+    [
+      "incumbent",
+      [
+        86911.20833333333,
+        74539.0
+      ]
+    ],
+    [
+      "mix_cap = 1.5",
+      [
+        87369.3125,
+        76626.0
+      ]
+    ],
+    [
+      "all changes together",
+      [
+        87369.3125,
+        76626.0
+      ]
+    ]
+  ]
+}

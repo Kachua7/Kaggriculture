@@ -128,6 +128,20 @@
   .todo p{margin:0;font-size:12.5px;max-width:none}
   .cmd{font-family:var(--mono);font-size:12px;background:var(--ink);color:#EDECF2;padding:9px 12px;
        border-radius:2px;overflow-x:auto;white-space:pre;margin:8px 0 0}
+
+  /* ruled out -- negative results, kept on the page on purpose */
+  .ruled{border-top:1px solid var(--rule-hard)}
+  .ruled .rr{display:grid;grid-template-columns:1fr 290px;gap:18px;align-items:start;
+             padding:12px 2px;border-bottom:1px solid var(--rule)}
+  .ruled h4{margin:0 0 3px;font-size:13.5px;font-weight:700;letter-spacing:-.005em}
+  .ruled h4 s{color:var(--mute);font-weight:400;text-decoration-color:var(--rule-hard)}
+  .ruled p{margin:0;font-size:12.5px;max-width:64ch}
+  .ruled .fig{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:11px;
+              color:var(--mute);line-height:1.6;white-space:pre;overflow-x:auto}
+  .ruled .fig b{display:block;font-family:var(--mono);font-size:14px;font-weight:700;
+                letter-spacing:-.02em;color:var(--flesh);margin-bottom:3px;white-space:nowrap}
+  .ruled .fig b.flat{color:var(--mute)}
+  @media(max-width:820px){.ruled .rr{grid-template-columns:1fr;gap:8px}}
 </style>
 </head>
 <body>
@@ -136,18 +150,20 @@
 <header class="hero rise">
   <div>
     <p class="eyebrow">Kaggriculture · agent build log · 5 September 2026</p>
-    <div class="bank"><span class="cur">$</span>85,852</div>
+    <div class="bank"><span class="cur">$</span>86,575</div>
     <p class="bankcap">Mean terminal bank over 144 mirror episodes — seeds 0–47 against
       <span class="num">starter</span>, <span class="num">heuristic</span> and
-      <span class="num">random</span>. Terminal bank is the only thing the competition scores.</p>
-    <span class="delta">▲ $12,265 today &nbsp;·&nbsp; was $73,587</span>
+      <span class="num">random</span>. That is the tuning panel, and the lowest-scoring of the
+      four blocks measured; the held-out seeds run higher. Terminal bank is the only thing the
+      competition scores.</p>
+    <span class="delta">▲ $12,988 today &nbsp;·&nbsp; was $73,587</span>
   </div>
   <dl class="kpi">
-    <div><dt>10th percentile</dt><dd>$74,727</dd></div>
-    <div><dt>Worst episode</dt><dd>$59,049</dd></div>
+    <div><dt>10th percentile</dt><dd>$75,455</dd></div>
+    <div><dt>Worst episode</dt><dd>$60,349</dd></div>
     <div><dt>Episodes won</dt><dd>144 / 144</dd></div>
-    <div><dt>Held-out replication</dt><dd>$86,984 <small>seeds 48–95</small></dd></div>
-    <div><dt>Slowest turn</dt><dd>2.0 ms <small>budget 1,000</small></dd></div>
+    <div><dt>Held-out replication</dt><dd>$87,775 <small>seeds 48–191, 432 eps</small></dd></div>
+    <div><dt>Slowest turn</dt><dd>5.6 ms <small>budget 1,000</small></dd></div>
     <div><dt>Submissions made</dt><dd style="color:var(--flesh)">0 <small>18 days left</small></dd></div>
   </dl>
 </header>
@@ -176,24 +192,24 @@
     <span><i style="border-style:dashed;border-color:var(--flesh);background:none"></i>100-slot shed cap</span>
   </div>
   <div class="callout">
-    <p><strong>Day 27 carried 160 items in bags against a shed with 77 slots free.</strong>
+    <p><strong>Day 27 carried 171 items in bags against a shed with 76 slots free.</strong>
       On the worst seed that midnight destroyed 142 strawberries — about $40,000 — in one call,
       while the sell order placed that same turn asked for 215 units and filled 23. It accounted
       for nearly the whole gap between the good seeds and the bad ones.</p>
   </div>
   <p class="fine" style="margin-top:14px">Two fixes, measured separately. A hand now interrupts
     its round to deliver when the farm is carrying more than two shed-loads and that hand holds
-    18+ items: day-27 bags fall from 160 to 111. And the end-of-season liquidation starts five
-    days out instead of two, which empties the shed from day 25 and puts a full 100 slots of
-    headroom exactly where the wave lands. Days 0–24 are byte-identical in both rows, which is
-    the check that the delivery rule never fires on a quiet day. The lower row still clears the
-    cap line — 111 into 100 — and that last 11 units is where the residual loss in the fourth
-    card below comes from. The overflow went from 83 items to 11, not to nothing.</p>
+    18+ items: day-27 bags fall from 171 to 99. And the end-of-season liquidation starts five
+    days out instead of two, which empties the shed from day 25 and puts all 100 slots of headroom
+    exactly where the wave lands. Together the peak goes from 95 items over the cap to none —
+    the lower row now clears the dashed line with a slot to spare, and the season's destroyed
+    count falls from 81.9 items to 11.0. Days 0–24 are byte-identical in both rows, which is the
+    check that the delivery rule never fires on a quiet day.</p>
 </section>
 
 <section>
   <div class="sechead"><h2>The whole build, in order</h2>
-    <span class="tag">ten phases · six shipped</span></div>
+    <span class="tag">eleven phases · eight closed</span></div>
   <div class="ledger">
     <div class="row">
       <div class="ph">01</div>
@@ -241,45 +257,54 @@
     <div class="row">
       <div class="ph">06</div>
       <div><h3>Endgame shed overflow</h3>
-        <p>Today's work. Seventy-four of every seventy-five items lost in a season were
-          destroyed in a single midnight dump on day 28. Haul discipline in the field, and a
-          five-day liquidation window instead of two.</p></div>
+        <p>Today. Seventy-four of every seventy-five items lost in a season were destroyed in a
+          single midnight dump on day 28. Haul discipline in the field, and a five-day
+          liquidation window instead of two.</p></div>
       <div class="state done"><i></i>Shipped</div>
       <div class="money">$73,587 → <b>$85,852</b></div>
     </div>
-    <div class="row is-now">
+    <div class="row">
       <div class="ph">07</div>
-      <div><h3>Re-cut the melon acreage</h3>
-        <p>The crop mix was tuned against a melon yield <span class="num">1.8×</span> too low, so
-          the farm grows far more melon than the allocator believes — into the one market with no
-          shop buying it. 176 units a season realize <span class="num">76.8%</span> of base;
-          strawberry realizes <span class="num">212.9%</span>.</p></div>
-      <div class="state now"><i></i>In progress</div>
-      <div class="money">76.8% vs 212.9%</div>
+      <div><h3>Melon acreage — ruled out</h3>
+        <p>The obvious next win, and it was not one. Capping the opening monoculture costs
+          <b>$56,000</b>: melon is what funds the strawberry board, and nothing else pays before
+          day 12. Every setting from 1.5 up is within noise. Axis closed.</p></div>
+      <div class="state done"><i></i>Closed</div>
+      <div class="money">−$56k to "fix" it</div>
     </div>
     <div class="row">
       <div class="ph">08</div>
-      <div><h3>Livestock as a fertilizer route</h3>
-        <p>Collecting fertilizer returns <span class="num">$100</span> a visit, unconditionally,
-          every day, for every animal — a better return per action than any crop tile in the game.
-          The farm currently owns no animals.</p></div>
-      <div class="state next"><i></i>Queued</div>
-      <div class="money">$100 / visit</div>
+      <div><h3>One animal, for the fertilizer</h3>
+        <p>Also today. Collecting fertilizer pays $100 a visit unconditionally. One animal
+          improved mean, 10th percentile, worst case <em>and</em> spoilage on three disjoint
+          144-episode panels. Two animals did not — it flips sign on the third.</p></div>
+      <div class="state done"><i></i>Shipped</div>
+      <div class="money">$85,852 → <b>$86,575</b></div>
     </div>
-    <div class="row">
+    <div class="row is-now">
       <div class="ph">09</div>
       <div><h3>Glut side of the price curves</h3>
-        <p>All nine crops are still fitted above the reference inventory, because the replay
-          never pushed a market into surplus. The largest remaining unknown, and it sits
-          underneath every sell decision the agent makes.</p></div>
-      <div class="state next"><i></i>Queued</div>
-      <div class="money">9 curves fitted</div>
+        <p>Now the largest item, by default. All nine goods are guesses above the reference
+          inventory, because the calibration replay never pushed a market into surplus. Every
+          sell and every planting decision rests on them.</p></div>
+      <div class="state now"><i></i>Next up</div>
+      <div class="money">9 / 9 fitted</div>
     </div>
     <div class="row">
       <div class="ph">10</div>
+      <div><h3>Opponent-aware selling and self-play</h3>
+        <p>The agent has never been scored against a copy of itself, and the three built-in
+          opponents are all weaker than it is. Both farms sell into one shared order book, so
+          the opponent's volume is the other half of every price.</p></div>
+      <div class="state next"><i></i>Queued</div>
+      <div class="money">3 weak opponents</div>
+    </div>
+    <div class="row">
+      <div class="ph">11</div>
       <div><h3>Ladder submissions</h3>
-        <p>Zero uploads with eighteen days to go. A ladder rating needs episodes to converge,
-          so the first submission should not wait on the last tuning pass.</p></div>
+        <p>Zero uploads with eighteen days to go. Packaging is built and negative-tested both
+          ways. A ladder rating needs episodes to converge, so the first submission should not
+          wait on the last tuning pass.</p></div>
       <div class="state block"><i></i>Blocked on you</div>
       <div class="money"><b>18 days</b></div>
     </div>
@@ -294,34 +319,100 @@
     much evidence there is that the money is real, which is not the same as how large it might be.</p>
   <div class="todo">
     <article>
-      <h4>1 · Melon is over-planted 3×</h4>
-      <span class="amt">176 → 60</span>
-      <p>units grown against units the town can absorb. Melon is in no shop basket, so its only
-        buyer is the town centre's two a day — 60 for the season, split with the opponent. The
-        acreage was cut against a yield of 0.33 units per tile-day when the real figure is 0.60,
-        so the farm floods a market it was never told was shallow, and realizes 76.8% of base.</p>
-    </article>
-    <article>
-      <h4>2 · Livestock is untouched</h4>
-      <span class="amt">$100</span>
-      <p>per fertilizer visit, for every animal, every day — the engine re-arms it unconditionally
-        and fertilizer appears in no shop basket, so its price never sags. Higher return per action
-        than any crop visit. The farm owns none.</p>
-    </article>
-    <article>
-      <h4>3 · Nine unfitted price curves</h4>
+      <h4>1 · Nine unfitted price curves</h4>
       <span class="amt">9 / 9</span>
-      <p>crops are guesses on the surplus side, because the calibration replay never pushed a
-        market past its reference inventory. This is downside risk rather than upside: the sell
-        logic is reasoning from numbers nobody has checked.</p>
+      <p>goods are guesses on the surplus side, because the calibration replay never pushed a
+        market past its reference inventory. This is downside risk rather than upside — the sell
+        logic and the tile allocator both reason from numbers nobody has checked. It is also the
+        cheapest item on this list to close, and the one command below closes it.</p>
     </article>
     <article>
-      <h4>4 · What the fix left behind</h4>
-      <span class="amt">16.1</span>
-      <p>items still destroyed per episode, down from 62.4. Nine of them at the day-28 dump and
-        three at day 29. Worth one more probe, but it is no longer where the money is.</p>
+      <h4>2 · Nobody strong has played it</h4>
+      <span class="amt">3 weak</span>
+      <p>opponents, all of which lose 144 out of 144. Both farms sell into one shared order book,
+        so the opponent's volume is the other half of every price the agent sees — and the ladder
+        will pair it against agents that also know melon is shallow. Self-play is the only way to
+        find out what that does.</p>
+    </article>
+    <article>
+      <h4>3 · What the fix left behind</h4>
+      <span class="amt">11.0</span>
+      <p>items still destroyed per episode, down from 81.9. Only 4.3 of them are left at the
+        day-28 dump; the rest are spread thin — 2.7 on day 20, 1.7 each on days 15 and 26, where
+        one cohort ripens into a shed that happens to be briefly full. No single turn to fix.
+        Worth one more probe. It is no longer where the money is.</p>
+    </article>
+    <article>
+      <h4>4 · Nothing has been submitted</h4>
+      <span class="amt">0</span>
+      <p>uploads in eighteen days. Every figure on this page is a mirror figure: my
+        reimplementation of the rules, scored against my own opponents. None of it is a ladder
+        rank, and a ladder rank is the only score the competition keeps.</p>
     </article>
   </div>
+</section>
+
+<section>
+  <div class="sechead"><h2>What got ruled out</h2>
+    <span class="tag">four dead ends, all measured</span></div>
+  <p>Half of today was spent proving that plausible ideas are wrong, and that is worth as much
+    page space as the wins. Each of these was re-measured this evening against the shipped agent,
+    so the numbers are current rather than remembered. Two of them were <em>my</em> stated
+    priorities this morning.</p>
+  <div class="ruled">
+    <div class="rr">
+      <div><h4>1 · <s>Cap the melon monoculture</s></h4>
+        <p>The opening runs 24 of the starting quadrant's 25 tiles as melon — the crop no shop
+          buys. It looked like the obvious next win. Tightening the per-crop ceiling from 3.0 to
+          1.0 costs fifty-five thousand dollars, because the melon is not there to be sold; it is
+          there to buy the second and third quadrants before day 12. Spoilage does fall to 0.5,
+          which is the tell: the farm has stopped producing anything worth losing.</p></div>
+      <div class="fig"><b>−$55,573</b>mix_cap  3.0 → 1.0
+mean  $86,575 → $31,002
+p10   $75,455 → $13,443
+lost      12.2 → 0.5</div>
+    </div>
+    <div class="rr">
+      <div><h4>2 · <s>A second animal</s></h4>
+        <p>One animal paid, so two should pay twice — and on the tuning block it looks like it
+          does, with a 10th percentile $1,494 better. It does not survive contact with fresh
+          seeds. Across four disjoint blocks the effect is flat, flat, then negative twice. The
+          fertilizer bill is only about 97 doses a season, so the second animal's output is
+          unsold surplus that still takes shed slots: spoilage rises from 8.8 to 12.2.</p></div>
+      <div class="fig"><b>−$638</b>n_animals  1 → 2
+d_mean by block, 576 eps
+  0-47      +34
+  48-95     +43
+  96-143  −1,312
+  144-191 −1,318</div>
+    </div>
+    <div class="rr">
+      <div><h4>3 · <s>Haul whenever the shed is filling</s></h4>
+        <p>Reusing the threshold that already forces full sells, so a hand delivers on any
+          pressure rather than only when its own bag holds multiples of the shed. It works, in the
+          sense that it removes the spoilage — and it loses money anyway, because the commutes come
+          out of the watering rounds. The loss worth preventing is one catastrophic dump, not the
+          steady trickle. <strong>Spoilage is not the objective.</strong></p></div>
+      <div class="fig"><b>−$1,559</b>haul_trigger  2.0 → 0.55
+mean  $86,575 → $85,015
+lost      12.2 → 9.6
+thirst    75.8 → 78.0</div>
+    </div>
+    <div class="rr">
+      <div><h4>4 · <s>Two tuning axes</s></h4>
+        <p>The land-purchase margin and the price cap on speculative selling both measured flat
+          across their entire candidate range — every cell inside the noise band of the incumbent.
+          They have been deleted from the sweep rather than left in, because on a panel this size
+          an axis that cannot move the number still costs thirty evaluations every round and gives
+          the descent thirty more chances to fit noise.</p></div>
+      <div class="fig"><b class="flat">±$0</b>land_margin  dropped
+px_cap       dropped
+all cells within ~$1k SE</div>
+    </div>
+  </div>
+  <p class="fine" style="margin-top:14px">The rule these produced: a single-axis win under about
+    $500 on 144 episodes is a coin flip, and nothing is adopted until it holds sign on seeds the
+    tuner never saw. Every sweep now ends on a holdout block for that reason.</p>
 </section>
 
 <section>
@@ -336,7 +427,7 @@
     source into <span class="num">calibration/</span>, and then runs the ground-truth traces.
     Your system Python is not touched.</p>
   <div class="cmd">cd ~/Desktop/kaggriculture &amp;&amp; bash bootstrap.sh</div>
-  <p class="fine" style="margin-top:8px">That single command also retires the third item on the
+  <p class="fine" style="margin-top:8px">That single command also retires the first item on the
     list above: with the engine source readable in the folder, the nine fitted price curves become
     nine read ones, and every sell decision stops resting on a guess.</p>
   <p style="margin-top:16px">Two things it cannot do for you. Accept the competition rules once,
@@ -356,15 +447,15 @@ mkdir -p ~/.kaggle &amp;&amp; mv ~/Downloads/kaggle.json ~/.kaggle/ &amp;&amp; c
    died -- the probe records it one day later, since the engine increments the clock first. */
 var DAT = {
   A:{ /* before: haul_trigger 999, endgame_days 2 */
-    shed:[9,9,9,9,9,9,9,9,9,9,23,24,24,24,24,24,24,24,24,24,24,21.1,22.9,23.8,24,23.3,22.4,23.2,0,0],
-    bags:[0,0,0,0,0,0,0,0,0,0,0.8,0,0,0,2.9,13.6,11.9,0,0.7,4.2,13.6,24,3.3,4.5,6.2,14.6,16.2,160,70.4,6.2],
-    lost:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2.2,1.1,0,0,0,1.3,0,0,0,0,0,0.5,67.3,2.5,0]},
+    shed:[11,11,11,10,10,10,10,10,10,10,10,25,26,26,27,26.6,27.5,29.6,30.6,30.2,30.4,21.5,26.3,26.5,26.3,25.5,26,24.1,0,0],
+    bags:[0,0,0,0,0,0,0,0,0,0,0,0,0,1,2.3,12.1,9,1.3,0.5,3.7,12.8,22.1,3.8,3.5,4.6,11.9,15.2,171,72.2,2.9],
+    lost:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1.7,0.5,0,0,0,2.7,0,0,0,0,0,1.8,75.2,0,0]},
   B:{ /* after */
-    shed:[9,9,9,9,9,9,9,9,9,9,23,24,24,24,24,24,24,24,24,24,24,21.1,22.9,23.8,24,0,0,0,0,0],
-    bags:[0,0,0,0,0,0,0,0,0,0,0.8,0,0,0,2.9,13.6,11.9,0,0.7,4.2,13.6,24,3.3,4.5,6.2,10.4,16,110.8,72.6,7],
-    lost:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2.2,1.1,0,0,0,1.3,0,0,0,0,0,0,9.2,2.7,0]}
+    shed:[11,11,11,10,10,10,10,10,10,10,10,25,26,26,27,26.6,27.5,29.6,30.6,30.2,30.4,21.5,26.3,26.5,26.3,0,0,0,0,0],
+    bags:[0,0,0,0,0,0,0,0,0,0,0,0,0,1,2.3,12.1,9,1.3,0.5,3.7,12.8,22.1,3.8,3.5,4.6,11.2,14.9,99,70.6,6.3],
+    lost:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1.7,0.5,0,0,0,2.7,0,0,0,0,0,1.7,4.3,0.1,0]}
 };
-var TOP = 190, CAP = 100;
+var TOP = 200, CAP = 100;
 
 function strip(rowId, dayId, d){
   var bars = document.getElementById(rowId), days = document.getElementById(dayId);

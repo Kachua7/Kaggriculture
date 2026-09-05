@@ -43,10 +43,15 @@ from kagfarm.policy import PARAMS
 # Candidate values per axis. Ordered so the incumbent default is somewhere in the middle,
 # which makes a no-change pass cheap to recognise.
 AXES = {
+    # `mix_cap` is the only handle on the OPENING. Measured over days 0-29 on 4 seeds, the
+    # per-crop ceiling never binds once the land opens -- melon sits at 1-8 tiles against a
+    # ceiling of 104 -- but on the single starting quadrant it caps melon at 26.1 against 25
+    # tiles of land, so days 1-9 run 24/25 tiles of melon, the one crop no shop buys. 1.0 caps
+    # melon at 8.7 tiles there; 0.6 at 5.2. This axis is really "how much of the opening is
+    # allowed to be one crop", and it is scored below.
     "mix_cap":     [0.6, 1.0, 1.5, 2.0, 3.0, 100.0],
     "seed_alpha":  [0.0, 0.15, 0.3, 0.5, 0.8, 1.0],
     "max_hands":   [6, 8, 10, 12, 14, 16, 20],
-    "land_margin": [1.0, 1.05, 1.2, 1.5, 2.0],
     "reserve":     [0.0, 0.6, 0.9, 1.1, 1.3],
     "crowded":     [0.4, 0.55, 0.7, 0.85],
     "seed_slots":  [2, 3, 4, 5],
@@ -56,9 +61,18 @@ AXES = {
     "fert_margin": [1.2, 1.6, 2.0, 2.3, 2.6, 3.0],
     "fert_stock":  [8, 12, 14, 16, 20, 24],
     "drain_frac":  [0.0, 0.2, 0.3, 0.45, 0.6, 0.8, 1.0],
-    "px_cap":      [1.5, 2.0, 2.5, 3.0],
-    "endgame_days": [1, 2, 3, 4],
+    # Incumbent is 5 and the curve is single-peaked around it: 4 is $2.4k worse, 6 is $1.0k
+    # worse, 8 gives back half the gain. The old list stopped at 4, which meant any descent
+    # over this axis silently regressed the largest win in the project.
+    "endgame_days": [3, 4, 5, 6, 8],
+    # Haul discipline. Both sharp, and both measured the wrong way round from intuition -- see
+    # the comments on `haul_trigger` in policy.py. 0.55 drives spoilage to zero and costs $9.6k.
+    "haul_trigger": [0.55, 1.0, 1.5, 2.0, 2.5, 999.0],
+    "haul_min":    [10, 14, 18, 22, 28],
+    "n_animals":   [0, 1, 2, 3, 4],
 }
+# Dropped: `land_margin` and `px_cap`. Both measured flat across their whole candidate range on
+# 144 episodes -- every cell within noise of the incumbent -- so they only spent evaluations.
 
 
 def score(params, seeds, opps, workers):
