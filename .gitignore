@@ -14,6 +14,10 @@ artifacts/
 *.json.gz
 replay*.json
 submission.tar.gz
+# the single-file build is a pure function of main.py + kagfarm/ and 112KB of it changes on
+# every policy edit; `bundle.py` regenerates and re-verifies it in under a second, so the
+# package commit is the record of what was submitted, not this file.
+submission/
 
 # secrets
 kaggle.json

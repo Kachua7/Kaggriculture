@@ -1,0 +1,23 @@
+{
+  "params": {
+    "mix_cap": 3.0,
+    "seed_alpha": 0.15,
+    "max_hands": 8,
+    "land_margin": 1.2,
+    "reserve": 1.3,
+    "crowded": 0.4,
+    "seed_slots": 2,
+    "hire_hours": 4,
+    "seed_grace": 3,
+    "labour_slack": 1.0,
+    "fert_margin": 2.6,
+    "fert_stock": 24,
+    "drain_frac": 1.0,
+    "px_cap": 2.0,
+    "endgame_days": 2
+  },
+  "mean": 96785.65625,
+  "p10": 78108.0,
+  "seeds": 16,
+  "opps": "starter,heuristic"
+}

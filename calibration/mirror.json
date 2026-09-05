@@ -1,0 +1,3871 @@
+{
+ "probes": {
+  "price_grid": {
+   "fn": "price_for",
+   "data": {
+    "WHEAT": {
+     "8000": 70,
+     "9000": 57,
+     "9500": 47,
+     "9800": 39,
+     "9900": 35,
+     "9950": 32,
+     "9980": 29,
+     "10000": 25,
+     "10020": 22,
+     "10050": 22,
+     "10100": 21,
+     "10200": 21,
+     "10300": 20,
+     "10400": 20,
+     "10500": 20,
+     "10800": 19,
+     "11000": 19,
+     "11500": 19,
+     "12000": 19,
+     "14000": 18
+    },
+    "CARROT": {
+     "8000": 3513,
+     "9000": 531,
+     "9500": 77,
+     "9800": 51,
+     "9900": 43,
+     "9950": 39,
+     "9980": 37,
+     "10000": 35,
+     "10020": 30,
+     "10050": 27,
+     "10100": 23,
+     "10200": 19,
+     "10300": 15,
+     "10400": 12,
+     "10500": 9,
+     "10800": 2,
+     "11000": 1,
+     "11500": 1,
+     "12000": 1,
+     "14000": 1
+    },
+    "TOMATO": {
+     "8000": 15852,
+     "9000": 3252,
+     "9500": 552,
+     "9800": 84,
+     "9900": 72,
+     "9950": 66,
+     "9980": 62,
+     "10000": 60,
+     "10020": 49,
+     "10050": 42,
+     "10100": 35,
+     "10200": 24,
+     "10300": 16,
+     "10400": 9,
+     "10500": 3,
+     "10800": 1,
+     "11000": 1,
+     "11500": 1,
+     "12000": 1,
+     "14000": 1
+    },
+    "STRAWBERRY": {
+     "8000": 496,
+     "9000": 386,
+     "9500": 308,
+     "9800": 239,
+     "9900": 204,
+     "9950": 179,
+     "9980": 158,
+     "10000": 120,
+     "10020": 82,
+     "10050": 24,
+     "10100": 1,
+     "10200": 1,
+     "10300": 1,
+     "10400": 1,
+     "10500": 1,
+     "10800": 1,
+     "11000": 1,
+     "11500": 1,
+     "12000": 1,
+     "14000": 1
+    },
+    "MELON": {
+     "8000": 317,
+     "9000": 311,
+     "9500": 304,
+     "9800": 296,
+     "9900": 290,
+     "9950": 284,
+     "9980": 277,
+     "10000": 250,
+     "10020": 246,
+     "10050": 225,
+     "10100": 150,
+     "10200": 1,
+     "10300": 1,
+     "10400": 1,
+     "10500": 1,
+     "10800": 1,
+     "11000": 1,
+     "11500": 1,
+     "12000": 1,
+     "14000": 1
+    },
+    "EGG": {
+     "8000": 4209,
+     "9000": 758,
+     "9500": 121,
+     "9800": 62,
+     "9900": 56,
+     "9950": 53,
+     "9980": 51,
+     "10000": 50,
+     "10020": 45,
+     "10050": 43,
+     "10100": 42,
+     "10200": 41,
+     "10300": 40,
+     "10400": 40,
+     "10500": 39,
+     "10800": 38,
+     "11000": 38,
+     "11500": 37,
+     "12000": 37,
+     "14000": 36
+    },
+    "MILK": {
+     "8000": 549,
+     "9000": 435,
+     "9500": 354,
+     "9800": 283,
+     "9900": 247,
+     "9950": 221,
+     "9980": 199,
+     "10000": 160,
+     "10020": 118,
+     "10050": 55,
+     "10100": 1,
+     "10200": 1,
+     "10300": 1,
+     "10400": 1,
+     "10500": 1,
+     "10800": 1,
+     "11000": 1,
+     "11500": 1,
+     "12000": 1,
+     "14000": 1
+    },
+    "WOOL": {
+     "8000": 265,
+     "9000": 259,
+     "9500": 253,
+     "9800": 245,
+     "9900": 240,
+     "9950": 234,
+     "9980": 226,
+     "10000": 200,
+     "10020": 177,
+     "10050": 55,
+     "10100": 1,
+     "10200": 1,
+     "10300": 1,
+     "10400": 1,
+     "10500": 1,
+     "10800": 1,
+     "11000": 1,
+     "11500": 1,
+     "12000": 1,
+     "14000": 1
+    },
+    "FERTILIZER": {
+     "8000": 500,
+     "9000": 300,
+     "9500": 200,
+     "9800": 140,
+     "9900": 120,
+     "9950": 110,
+     "9980": 104,
+     "10000": 100,
+     "10020": 96,
+     "10050": 90,
+     "10100": 80,
+     "10200": 60,
+     "10300": 40,
+     "10400": 20,
+     "10500": 1,
+     "10800": 1,
+     "11000": 1,
+     "11500": 1,
+     "12000": 1,
+     "14000": 1
+    }
+   }
+  },
+  "yield_traces": {
+   "WHEAT": {
+    "n_turns": 768,
+    "daily": [
+     {
+      "step": 23,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "WHEAT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 1,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 47,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "WHEAT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 71,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "WHEAT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 95,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "WHEAT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 119,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "WHEAT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 4,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 143,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "WHEAT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 4,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 167,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "WHEAT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 191,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "WHEAT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 215,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "WHEAT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 239,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "WHEAT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 263,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "WHEAT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 287,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "WHEAT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 311,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 335,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 359,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 383,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 407,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 431,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 455,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 479,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 503,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 527,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 551,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 575,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 599,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 623,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 647,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 671,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 695,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 719,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 743,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     },
+     {
+      "step": 767,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2960.0
+     }
+    ],
+    "raw_obs_samples": []
+   },
+   "CARROT": {
+    "n_turns": 768,
+    "daily": [
+     {
+      "step": 23,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "CARROT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 1,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 47,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "CARROT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 71,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "CARROT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 95,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "CARROT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 119,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "CARROT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 143,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "CARROT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 167,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "CARROT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 191,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "CARROT",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 215,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 239,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 263,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 287,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 311,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 335,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 359,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 383,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 407,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 431,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 455,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 479,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 503,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 527,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 551,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 575,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 599,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 623,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 647,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 671,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 695,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 719,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 743,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     },
+     {
+      "step": 767,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2920.0
+     }
+    ],
+    "raw_obs_samples": []
+   },
+   "MELON": {
+    "n_turns": 768,
+    "daily": [
+     {
+      "step": 23,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 1,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 47,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 71,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 95,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 119,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 143,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 167,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 191,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 215,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 239,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 263,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 287,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 311,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 4,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 335,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 4,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 359,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 383,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 407,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 431,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 455,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 479,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "MELON",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 503,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 527,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 551,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 575,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 599,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 623,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 647,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 671,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 695,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 719,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 743,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2680.0
+     },
+     {
+      "step": 767,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2680.0
+     }
+    ],
+    "raw_obs_samples": []
+   },
+   "TOMATO": {
+    "n_turns": 768,
+    "daily": [
+     {
+      "step": 23,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 1,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 47,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 71,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 95,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 119,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 143,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 167,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 191,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 215,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 1,
+       "_decaying": false
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 239,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 2,
+       "_decaying": false
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 263,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 3,
+       "_decaying": false
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 287,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 4,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": false
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 311,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 4,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 335,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 4,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 359,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 383,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 407,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 431,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 455,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 479,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "TOMATO",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 503,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 527,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 551,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 575,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 599,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 623,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 647,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 671,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 695,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 719,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 743,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2800.0
+     },
+     {
+      "step": 767,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2800.0
+     }
+    ],
+    "raw_obs_samples": []
+   },
+   "STRAWBERRY": {
+    "n_turns": 768,
+    "daily": [
+     {
+      "step": 23,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 1,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 47,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 71,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 95,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 119,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 143,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 167,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 191,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 215,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 239,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 0,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 0,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 263,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 1,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 287,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 1,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 311,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 2,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 335,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 2,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 359,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 3,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 383,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 3,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 407,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 4,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": false
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 431,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 4,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 455,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 479,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 3,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 503,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 527,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 2,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 551,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 575,
+      "tile": {
+       "kind": "PLANT",
+       "crop": "STRAWBERRY",
+       "planted_day": 0,
+       "watered_today": true,
+       "consecutive_unwatered": 0,
+       "yield_units": 1,
+       "max_lifespan_step": -1,
+       "fertilized_until_day": -1,
+       "_sched_done": 4,
+       "_decaying": true
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 599,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 623,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 647,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 671,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 695,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 719,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 743,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2600.0
+     },
+     {
+      "step": 767,
+      "tile": {
+       "kind": "WEED"
+      },
+      "money": 2600.0
+     }
+    ],
+    "raw_obs_samples": []
+   }
+  },
+  "peak_yields": {
+   "WHEAT": {
+    "unfert": {
+     "peak_units": 4,
+     "peak_day": 4
+    },
+    "fert": {
+     "peak_units": 6,
+     "peak_day": 4
+    },
+    "table_cap_fert": 6,
+    "table_cap_unfert": 4
+   },
+   "CARROT": {
+    "unfert": {
+     "peak_units": 3,
+     "peak_day": 3
+    },
+    "fert": {
+     "peak_units": 4,
+     "peak_day": 3
+    },
+    "table_cap_fert": 4,
+    "table_cap_unfert": 3
+   },
+   "MELON": {
+    "unfert": {
+     "peak_units": 4,
+     "peak_day": 12
+    },
+    "fert": {
+     "peak_units": 6,
+     "peak_day": 12
+    },
+    "table_cap_fert": 6,
+    "table_cap_unfert": 6
+   },
+   "TOMATO": {
+    "unfert": {
+     "peak_units": 4,
+     "peak_day": 11
+    },
+    "fert": {
+     "peak_units": 4,
+     "peak_day": 9
+    },
+    "table_cap_fert": 4,
+    "table_cap_unfert": 4
+   },
+   "STRAWBERRY": {
+    "unfert": {
+     "peak_units": 4,
+     "peak_day": 16
+    },
+    "fert": {
+     "peak_units": 4,
+     "peak_day": 14
+    },
+    "table_cap_fert": 4,
+    "table_cap_unfert": 4
+   }
+  },
+  "rule_checks": {
+   "early_harvest_exploit": {
+    "melons_in_hand_after_same_day_harvest": 0,
+    "expected_if_blocked": 0,
+    "exploit_open": false
+   },
+   "unwatered_on_plant_day": {
+    "tile_after_one_night": "WEED",
+    "died": true
+   },
+   "harvest_by_day": {
+    "WHEAT": {
+     "2": 2,
+     "3": 3,
+     "4": 4,
+     "5": 4,
+     "8": 2,
+     "10": 1
+    },
+    "CARROT": {
+     "2": 2,
+     "3": 3,
+     "4": 2,
+     "5": 2,
+     "8": 0
+    },
+    "MELON": {
+     "2": 0,
+     "3": 0,
+     "4": 0,
+     "5": 0,
+     "8": 0,
+     "10": 2,
+     "11": 3,
+     "12": 4,
+     "13": 4,
+     "14": 3,
+     "16": 2
+    },
+    "TOMATO": {
+     "2": 0,
+     "3": 0,
+     "4": 0,
+     "5": 0,
+     "8": 1,
+     "10": 3,
+     "11": 4,
+     "12": 4,
+     "13": 4,
+     "14": 3,
+     "16": 2
+    },
+    "STRAWBERRY": {
+     "2": 0,
+     "3": 0,
+     "4": 0,
+     "5": 0,
+     "8": 0,
+     "10": 1,
+     "11": 1,
+     "12": 2,
+     "13": 2,
+     "14": 3,
+     "16": 4
+    }
+   }
+  },
+  "idle_market_trace": {
+   "n_rows": 60,
+   "rows": [
+    {
+     "step": 0,
+     "market": {
+      "inventory": {
+       "WHEAT": 10000,
+       "CARROT": 10000,
+       "TOMATO": 10000,
+       "STRAWBERRY": 10000,
+       "MELON": 10000,
+       "EGG": 10000,
+       "MILK": 10000,
+       "WOOL": 10000,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 25,
+       "CARROT": 35,
+       "TOMATO": 60,
+       "STRAWBERRY": 120,
+       "MELON": 250,
+       "EGG": 50,
+       "MILK": 160,
+       "WOOL": 200,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 23,
+     "market": {
+      "inventory": {
+       "WHEAT": 10000,
+       "CARROT": 10000,
+       "TOMATO": 10000,
+       "STRAWBERRY": 10000,
+       "MELON": 10000,
+       "EGG": 10000,
+       "MILK": 10000,
+       "WOOL": 10000,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 25,
+       "CARROT": 35,
+       "TOMATO": 60,
+       "STRAWBERRY": 120,
+       "MELON": 250,
+       "EGG": 50,
+       "MILK": 160,
+       "WOOL": 200,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 24,
+     "market": {
+      "inventory": {
+       "WHEAT": 9999,
+       "CARROT": 9999,
+       "TOMATO": 9999,
+       "STRAWBERRY": 9999,
+       "MELON": 9999,
+       "EGG": 9999,
+       "MILK": 9999,
+       "WOOL": 9999,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 26,
+       "CARROT": 35,
+       "TOMATO": 60,
+       "STRAWBERRY": 128,
+       "MELON": 256,
+       "EGG": 50,
+       "MILK": 169,
+       "WOOL": 206,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 47,
+     "market": {
+      "inventory": {
+       "WHEAT": 9999,
+       "CARROT": 9999,
+       "TOMATO": 9999,
+       "STRAWBERRY": 9999,
+       "MELON": 9999,
+       "EGG": 9999,
+       "MILK": 9999,
+       "WOOL": 9999,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 26,
+       "CARROT": 35,
+       "TOMATO": 60,
+       "STRAWBERRY": 128,
+       "MELON": 256,
+       "EGG": 50,
+       "MILK": 169,
+       "WOOL": 206,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 48,
+     "market": {
+      "inventory": {
+       "WHEAT": 9998,
+       "CARROT": 9998,
+       "TOMATO": 9998,
+       "STRAWBERRY": 9998,
+       "MELON": 9998,
+       "EGG": 9998,
+       "MILK": 9998,
+       "WOOL": 9998,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 26,
+       "CARROT": 35,
+       "TOMATO": 60,
+       "STRAWBERRY": 132,
+       "MELON": 260,
+       "EGG": 50,
+       "MILK": 172,
+       "WOOL": 209,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 71,
+     "market": {
+      "inventory": {
+       "WHEAT": 9998,
+       "CARROT": 9998,
+       "TOMATO": 9998,
+       "STRAWBERRY": 9998,
+       "MELON": 9998,
+       "EGG": 9998,
+       "MILK": 9998,
+       "WOOL": 9998,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 26,
+       "CARROT": 35,
+       "TOMATO": 60,
+       "STRAWBERRY": 132,
+       "MELON": 260,
+       "EGG": 50,
+       "MILK": 172,
+       "WOOL": 209,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 72,
+     "market": {
+      "inventory": {
+       "WHEAT": 9997,
+       "CARROT": 9997,
+       "TOMATO": 9997,
+       "STRAWBERRY": 9997,
+       "MELON": 9997,
+       "EGG": 9997,
+       "MILK": 9997,
+       "WOOL": 9997,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 27,
+       "CARROT": 35,
+       "TOMATO": 60,
+       "STRAWBERRY": 135,
+       "MELON": 262,
+       "EGG": 50,
+       "MILK": 175,
+       "WOOL": 212,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 95,
+     "market": {
+      "inventory": {
+       "WHEAT": 9992,
+       "CARROT": 9997,
+       "TOMATO": 9997,
+       "STRAWBERRY": 9992,
+       "MELON": 9997,
+       "EGG": 9992,
+       "MILK": 9997,
+       "WOOL": 9997,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 28,
+       "CARROT": 35,
+       "TOMATO": 60,
+       "STRAWBERRY": 144,
+       "MELON": 262,
+       "EGG": 50,
+       "MILK": 175,
+       "WOOL": 212,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 96,
+     "market": {
+      "inventory": {
+       "WHEAT": 9990,
+       "CARROT": 9996,
+       "TOMATO": 9996,
+       "STRAWBERRY": 9990,
+       "MELON": 9996,
+       "EGG": 9990,
+       "MILK": 9996,
+       "WOOL": 9996,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 28,
+       "CARROT": 35,
+       "TOMATO": 60,
+       "STRAWBERRY": 147,
+       "MELON": 264,
+       "EGG": 51,
+       "MILK": 177,
+       "WOOL": 214,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 119,
+     "market": {
+      "inventory": {
+       "WHEAT": 9985,
+       "CARROT": 9996,
+       "TOMATO": 9996,
+       "STRAWBERRY": 9985,
+       "MELON": 9996,
+       "EGG": 9985,
+       "MILK": 9996,
+       "WOOL": 9996,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 29,
+       "CARROT": 35,
+       "TOMATO": 60,
+       "STRAWBERRY": 153,
+       "MELON": 264,
+       "EGG": 51,
+       "MILK": 177,
+       "WOOL": 214,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 120,
+     "market": {
+      "inventory": {
+       "WHEAT": 9983,
+       "CARROT": 9995,
+       "TOMATO": 9995,
+       "STRAWBERRY": 9983,
+       "MELON": 9995,
+       "EGG": 9983,
+       "MILK": 9995,
+       "WOOL": 9995,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 29,
+       "CARROT": 35,
+       "TOMATO": 61,
+       "STRAWBERRY": 155,
+       "MELON": 266,
+       "EGG": 51,
+       "MILK": 179,
+       "WOOL": 215,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 143,
+     "market": {
+      "inventory": {
+       "WHEAT": 9978,
+       "CARROT": 9995,
+       "TOMATO": 9995,
+       "STRAWBERRY": 9978,
+       "MELON": 9995,
+       "EGG": 9978,
+       "MILK": 9995,
+       "WOOL": 9995,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 30,
+       "CARROT": 35,
+       "TOMATO": 61,
+       "STRAWBERRY": 159,
+       "MELON": 266,
+       "EGG": 51,
+       "MILK": 179,
+       "WOOL": 215,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 144,
+     "market": {
+      "inventory": {
+       "WHEAT": 9976,
+       "CARROT": 9994,
+       "TOMATO": 9994,
+       "STRAWBERRY": 9976,
+       "MELON": 9994,
+       "EGG": 9976,
+       "MILK": 9994,
+       "WOOL": 9994,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 30,
+       "CARROT": 35,
+       "TOMATO": 61,
+       "STRAWBERRY": 161,
+       "MELON": 267,
+       "EGG": 51,
+       "MILK": 181,
+       "WOOL": 217,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 167,
+     "market": {
+      "inventory": {
+       "WHEAT": 9966,
+       "CARROT": 9994,
+       "TOMATO": 9994,
+       "STRAWBERRY": 9966,
+       "MELON": 9994,
+       "EGG": 9966,
+       "MILK": 9994,
+       "WOOL": 9994,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 31,
+       "CARROT": 35,
+       "TOMATO": 61,
+       "STRAWBERRY": 169,
+       "MELON": 267,
+       "EGG": 52,
+       "MILK": 181,
+       "WOOL": 217,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 168,
+     "market": {
+      "inventory": {
+       "WHEAT": 9963,
+       "CARROT": 9993,
+       "TOMATO": 9993,
+       "STRAWBERRY": 9963,
+       "MELON": 9993,
+       "EGG": 9963,
+       "MILK": 9993,
+       "WOOL": 9993,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 31,
+       "CARROT": 36,
+       "TOMATO": 61,
+       "STRAWBERRY": 171,
+       "MELON": 268,
+       "EGG": 52,
+       "MILK": 183,
+       "WOOL": 218,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 191,
+     "market": {
+      "inventory": {
+       "WHEAT": 9953,
+       "CARROT": 9993,
+       "TOMATO": 9993,
+       "STRAWBERRY": 9953,
+       "MELON": 9993,
+       "EGG": 9953,
+       "MILK": 9993,
+       "WOOL": 9993,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 32,
+       "CARROT": 36,
+       "TOMATO": 61,
+       "STRAWBERRY": 178,
+       "MELON": 268,
+       "EGG": 53,
+       "MILK": 183,
+       "WOOL": 218,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 192,
+     "market": {
+      "inventory": {
+       "WHEAT": 9950,
+       "CARROT": 9992,
+       "TOMATO": 9992,
+       "STRAWBERRY": 9950,
+       "MELON": 9992,
+       "EGG": 9950,
+       "MILK": 9992,
+       "WOOL": 9992,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 32,
+       "CARROT": 36,
+       "TOMATO": 61,
+       "STRAWBERRY": 179,
+       "MELON": 269,
+       "EGG": 53,
+       "MILK": 185,
+       "WOOL": 219,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 215,
+     "market": {
+      "inventory": {
+       "WHEAT": 9940,
+       "CARROT": 9992,
+       "TOMATO": 9992,
+       "STRAWBERRY": 9940,
+       "MELON": 9992,
+       "EGG": 9940,
+       "MILK": 9992,
+       "WOOL": 9992,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 33,
+       "CARROT": 36,
+       "TOMATO": 61,
+       "STRAWBERRY": 185,
+       "MELON": 269,
+       "EGG": 54,
+       "MILK": 185,
+       "WOOL": 219,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 216,
+     "market": {
+      "inventory": {
+       "WHEAT": 9937,
+       "CARROT": 9991,
+       "TOMATO": 9991,
+       "STRAWBERRY": 9937,
+       "MELON": 9991,
+       "EGG": 9937,
+       "MILK": 9991,
+       "WOOL": 9991,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 33,
+       "CARROT": 36,
+       "TOMATO": 61,
+       "STRAWBERRY": 187,
+       "MELON": 270,
+       "EGG": 54,
+       "MILK": 186,
+       "WOOL": 220,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 239,
+     "market": {
+      "inventory": {
+       "WHEAT": 9927,
+       "CARROT": 9991,
+       "TOMATO": 9991,
+       "STRAWBERRY": 9922,
+       "MELON": 9991,
+       "EGG": 9927,
+       "MILK": 9986,
+       "WOOL": 9991,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 34,
+       "CARROT": 36,
+       "TOMATO": 61,
+       "STRAWBERRY": 194,
+       "MELON": 270,
+       "EGG": 54,
+       "MILK": 193,
+       "WOOL": 220,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 240,
+     "market": {
+      "inventory": {
+       "WHEAT": 9924,
+       "CARROT": 9990,
+       "TOMATO": 9990,
+       "STRAWBERRY": 9918,
+       "MELON": 9990,
+       "EGG": 9924,
+       "MILK": 9984,
+       "WOOL": 9990,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 34,
+       "CARROT": 36,
+       "TOMATO": 61,
+       "STRAWBERRY": 196,
+       "MELON": 271,
+       "EGG": 55,
+       "MILK": 195,
+       "WOOL": 221,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 263,
+     "market": {
+      "inventory": {
+       "WHEAT": 9914,
+       "CARROT": 9990,
+       "TOMATO": 9990,
+       "STRAWBERRY": 9903,
+       "MELON": 9990,
+       "EGG": 9914,
+       "MILK": 9979,
+       "WOOL": 9990,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 34,
+       "CARROT": 36,
+       "TOMATO": 61,
+       "STRAWBERRY": 203,
+       "MELON": 271,
+       "EGG": 55,
+       "MILK": 200,
+       "WOOL": 221,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 264,
+     "market": {
+      "inventory": {
+       "WHEAT": 9911,
+       "CARROT": 9989,
+       "TOMATO": 9989,
+       "STRAWBERRY": 9899,
+       "MELON": 9989,
+       "EGG": 9911,
+       "MILK": 9977,
+       "WOOL": 9989,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 34,
+       "CARROT": 36,
+       "TOMATO": 61,
+       "STRAWBERRY": 204,
+       "MELON": 272,
+       "EGG": 55,
+       "MILK": 202,
+       "WOOL": 221,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 287,
+     "market": {
+      "inventory": {
+       "WHEAT": 9901,
+       "CARROT": 9989,
+       "TOMATO": 9989,
+       "STRAWBERRY": 9884,
+       "MELON": 9989,
+       "EGG": 9901,
+       "MILK": 9972,
+       "WOOL": 9989,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 35,
+       "CARROT": 36,
+       "TOMATO": 61,
+       "STRAWBERRY": 210,
+       "MELON": 272,
+       "EGG": 56,
+       "MILK": 206,
+       "WOOL": 221,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 288,
+     "market": {
+      "inventory": {
+       "WHEAT": 9898,
+       "CARROT": 9988,
+       "TOMATO": 9988,
+       "STRAWBERRY": 9880,
+       "MELON": 9988,
+       "EGG": 9898,
+       "MILK": 9970,
+       "WOOL": 9988,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 35,
+       "CARROT": 36,
+       "TOMATO": 61,
+       "STRAWBERRY": 212,
+       "MELON": 272,
+       "EGG": 56,
+       "MILK": 208,
+       "WOOL": 222,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 311,
+     "market": {
+      "inventory": {
+       "WHEAT": 9888,
+       "CARROT": 9988,
+       "TOMATO": 9988,
+       "STRAWBERRY": 9860,
+       "MELON": 9988,
+       "EGG": 9888,
+       "MILK": 9960,
+       "WOOL": 9988,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 36,
+       "CARROT": 36,
+       "TOMATO": 61,
+       "STRAWBERRY": 219,
+       "MELON": 272,
+       "EGG": 57,
+       "MILK": 215,
+       "WOOL": 222,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 312,
+     "market": {
+      "inventory": {
+       "WHEAT": 9885,
+       "CARROT": 9987,
+       "TOMATO": 9987,
+       "STRAWBERRY": 9855,
+       "MELON": 9987,
+       "EGG": 9885,
+       "MILK": 9957,
+       "WOOL": 9987,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 36,
+       "CARROT": 36,
+       "TOMATO": 62,
+       "STRAWBERRY": 221,
+       "MELON": 273,
+       "EGG": 57,
+       "MILK": 217,
+       "WOOL": 223,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 335,
+     "market": {
+      "inventory": {
+       "WHEAT": 9875,
+       "CARROT": 9987,
+       "TOMATO": 9987,
+       "STRAWBERRY": 9835,
+       "MELON": 9987,
+       "EGG": 9875,
+       "MILK": 9947,
+       "WOOL": 9987,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 36,
+       "CARROT": 36,
+       "TOMATO": 62,
+       "STRAWBERRY": 228,
+       "MELON": 273,
+       "EGG": 58,
+       "MILK": 223,
+       "WOOL": 223,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 336,
+     "market": {
+      "inventory": {
+       "WHEAT": 9872,
+       "CARROT": 9986,
+       "TOMATO": 9986,
+       "STRAWBERRY": 9830,
+       "MELON": 9986,
+       "EGG": 9872,
+       "MILK": 9944,
+       "WOOL": 9986,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 36,
+       "CARROT": 36,
+       "TOMATO": 62,
+       "STRAWBERRY": 230,
+       "MELON": 274,
+       "EGG": 58,
+       "MILK": 225,
+       "WOOL": 223,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 359,
+     "market": {
+      "inventory": {
+       "WHEAT": 9862,
+       "CARROT": 9986,
+       "TOMATO": 9986,
+       "STRAWBERRY": 9810,
+       "MELON": 9986,
+       "EGG": 9862,
+       "MILK": 9934,
+       "WOOL": 9986,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 37,
+       "CARROT": 36,
+       "TOMATO": 62,
+       "STRAWBERRY": 236,
+       "MELON": 274,
+       "EGG": 58,
+       "MILK": 231,
+       "WOOL": 223,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 360,
+     "market": {
+      "inventory": {
+       "WHEAT": 9859,
+       "CARROT": 9985,
+       "TOMATO": 9985,
+       "STRAWBERRY": 9805,
+       "MELON": 9985,
+       "EGG": 9859,
+       "MILK": 9931,
+       "WOOL": 9985,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 37,
+       "CARROT": 36,
+       "TOMATO": 62,
+       "STRAWBERRY": 237,
+       "MELON": 274,
+       "EGG": 58,
+       "MILK": 232,
+       "WOOL": 224,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 383,
+     "market": {
+      "inventory": {
+       "WHEAT": 9849,
+       "CARROT": 9985,
+       "TOMATO": 9985,
+       "STRAWBERRY": 9780,
+       "MELON": 9985,
+       "EGG": 9849,
+       "MILK": 9916,
+       "WOOL": 9985,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 37,
+       "CARROT": 36,
+       "TOMATO": 62,
+       "STRAWBERRY": 245,
+       "MELON": 274,
+       "EGG": 59,
+       "MILK": 240,
+       "WOOL": 224,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 384,
+     "market": {
+      "inventory": {
+       "WHEAT": 9846,
+       "CARROT": 9984,
+       "TOMATO": 9984,
+       "STRAWBERRY": 9774,
+       "MELON": 9984,
+       "EGG": 9846,
+       "MILK": 9912,
+       "WOOL": 9984,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 37,
+       "CARROT": 36,
+       "TOMATO": 62,
+       "STRAWBERRY": 246,
+       "MELON": 275,
+       "EGG": 59,
+       "MILK": 242,
+       "WOOL": 224,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 407,
+     "market": {
+      "inventory": {
+       "WHEAT": 9836,
+       "CARROT": 9984,
+       "TOMATO": 9984,
+       "STRAWBERRY": 9749,
+       "MELON": 9984,
+       "EGG": 9836,
+       "MILK": 9897,
+       "WOOL": 9984,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 38,
+       "CARROT": 36,
+       "TOMATO": 62,
+       "STRAWBERRY": 253,
+       "MELON": 275,
+       "EGG": 60,
+       "MILK": 248,
+       "WOOL": 224,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 408,
+     "market": {
+      "inventory": {
+       "WHEAT": 9833,
+       "CARROT": 9983,
+       "TOMATO": 9983,
+       "STRAWBERRY": 9743,
+       "MELON": 9983,
+       "EGG": 9833,
+       "MILK": 9893,
+       "WOOL": 9983,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 38,
+       "CARROT": 36,
+       "TOMATO": 62,
+       "STRAWBERRY": 255,
+       "MELON": 275,
+       "EGG": 60,
+       "MILK": 250,
+       "WOOL": 225,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 431,
+     "market": {
+      "inventory": {
+       "WHEAT": 9823,
+       "CARROT": 9983,
+       "TOMATO": 9983,
+       "STRAWBERRY": 9718,
+       "MELON": 9983,
+       "EGG": 9823,
+       "MILK": 9878,
+       "WOOL": 9983,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 38,
+       "CARROT": 36,
+       "TOMATO": 62,
+       "STRAWBERRY": 261,
+       "MELON": 275,
+       "EGG": 61,
+       "MILK": 256,
+       "WOOL": 225,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 432,
+     "market": {
+      "inventory": {
+       "WHEAT": 9820,
+       "CARROT": 9982,
+       "TOMATO": 9982,
+       "STRAWBERRY": 9712,
+       "MELON": 9982,
+       "EGG": 9820,
+       "MILK": 9874,
+       "WOOL": 9982,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 38,
+       "CARROT": 36,
+       "TOMATO": 62,
+       "STRAWBERRY": 263,
+       "MELON": 276,
+       "EGG": 61,
+       "MILK": 258,
+       "WOOL": 225,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 455,
+     "market": {
+      "inventory": {
+       "WHEAT": 9805,
+       "CARROT": 9982,
+       "TOMATO": 9977,
+       "STRAWBERRY": 9687,
+       "MELON": 9982,
+       "EGG": 9810,
+       "MILK": 9854,
+       "WOOL": 9982,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 39,
+       "CARROT": 36,
+       "TOMATO": 63,
+       "STRAWBERRY": 269,
+       "MELON": 276,
+       "EGG": 61,
+       "MILK": 265,
+       "WOOL": 225,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 456,
+     "market": {
+      "inventory": {
+       "WHEAT": 9801,
+       "CARROT": 9981,
+       "TOMATO": 9975,
+       "STRAWBERRY": 9681,
+       "MELON": 9981,
+       "EGG": 9807,
+       "MILK": 9849,
+       "WOOL": 9981,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 39,
+       "CARROT": 36,
+       "TOMATO": 63,
+       "STRAWBERRY": 270,
+       "MELON": 276,
+       "EGG": 62,
+       "MILK": 267,
+       "WOOL": 226,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 479,
+     "market": {
+      "inventory": {
+       "WHEAT": 9786,
+       "CARROT": 9981,
+       "TOMATO": 9970,
+       "STRAWBERRY": 9656,
+       "MELON": 9981,
+       "EGG": 9797,
+       "MILK": 9829,
+       "WOOL": 9981,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 40,
+       "CARROT": 36,
+       "TOMATO": 64,
+       "STRAWBERRY": 276,
+       "MELON": 276,
+       "EGG": 62,
+       "MILK": 274,
+       "WOOL": 226,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 480,
+     "market": {
+      "inventory": {
+       "WHEAT": 9782,
+       "CARROT": 9980,
+       "TOMATO": 9968,
+       "STRAWBERRY": 9650,
+       "MELON": 9980,
+       "EGG": 9794,
+       "MILK": 9824,
+       "WOOL": 9980,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 40,
+       "CARROT": 37,
+       "TOMATO": 64,
+       "STRAWBERRY": 277,
+       "MELON": 277,
+       "EGG": 62,
+       "MILK": 275,
+       "WOOL": 226,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 503,
+     "market": {
+      "inventory": {
+       "WHEAT": 9767,
+       "CARROT": 9980,
+       "TOMATO": 9963,
+       "STRAWBERRY": 9625,
+       "MELON": 9980,
+       "EGG": 9784,
+       "MILK": 9804,
+       "WOOL": 9980,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 40,
+       "CARROT": 37,
+       "TOMATO": 64,
+       "STRAWBERRY": 283,
+       "MELON": 277,
+       "EGG": 63,
+       "MILK": 282,
+       "WOOL": 226,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 504,
+     "market": {
+      "inventory": {
+       "WHEAT": 9763,
+       "CARROT": 9979,
+       "TOMATO": 9961,
+       "STRAWBERRY": 9619,
+       "MELON": 9979,
+       "EGG": 9781,
+       "MILK": 9799,
+       "WOOL": 9979,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 40,
+       "CARROT": 37,
+       "TOMATO": 65,
+       "STRAWBERRY": 284,
+       "MELON": 277,
+       "EGG": 63,
+       "MILK": 283,
+       "WOOL": 227,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 527,
+     "market": {
+      "inventory": {
+       "WHEAT": 9743,
+       "CARROT": 9979,
+       "TOMATO": 9956,
+       "STRAWBERRY": 9594,
+       "MELON": 9979,
+       "EGG": 9766,
+       "MILK": 9779,
+       "WOOL": 9979,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 41,
+       "CARROT": 37,
+       "TOMATO": 65,
+       "STRAWBERRY": 289,
+       "MELON": 277,
+       "EGG": 64,
+       "MILK": 289,
+       "WOOL": 227,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 528,
+     "market": {
+      "inventory": {
+       "WHEAT": 9738,
+       "CARROT": 9978,
+       "TOMATO": 9954,
+       "STRAWBERRY": 9588,
+       "MELON": 9978,
+       "EGG": 9762,
+       "MILK": 9774,
+       "WOOL": 9978,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 41,
+       "CARROT": 37,
+       "TOMATO": 66,
+       "STRAWBERRY": 291,
+       "MELON": 277,
+       "EGG": 64,
+       "MILK": 291,
+       "WOOL": 227,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 551,
+     "market": {
+      "inventory": {
+       "WHEAT": 9718,
+       "CARROT": 9978,
+       "TOMATO": 9949,
+       "STRAWBERRY": 9563,
+       "MELON": 9978,
+       "EGG": 9747,
+       "MILK": 9754,
+       "WOOL": 9978,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 42,
+       "CARROT": 37,
+       "TOMATO": 66,
+       "STRAWBERRY": 296,
+       "MELON": 277,
+       "EGG": 65,
+       "MILK": 296,
+       "WOOL": 227,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 552,
+     "market": {
+      "inventory": {
+       "WHEAT": 9713,
+       "CARROT": 9977,
+       "TOMATO": 9947,
+       "STRAWBERRY": 9557,
+       "MELON": 9977,
+       "EGG": 9743,
+       "MILK": 9749,
+       "WOOL": 9977,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 42,
+       "CARROT": 37,
+       "TOMATO": 66,
+       "STRAWBERRY": 297,
+       "MELON": 278,
+       "EGG": 65,
+       "MILK": 298,
+       "WOOL": 227,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 575,
+     "market": {
+      "inventory": {
+       "WHEAT": 9693,
+       "CARROT": 9977,
+       "TOMATO": 9942,
+       "STRAWBERRY": 9532,
+       "MELON": 9977,
+       "EGG": 9728,
+       "MILK": 9729,
+       "WOOL": 9977,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 43,
+       "CARROT": 37,
+       "TOMATO": 67,
+       "STRAWBERRY": 302,
+       "MELON": 278,
+       "EGG": 66,
+       "MILK": 303,
+       "WOOL": 227,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 576,
+     "market": {
+      "inventory": {
+       "WHEAT": 9688,
+       "CARROT": 9976,
+       "TOMATO": 9940,
+       "STRAWBERRY": 9526,
+       "MELON": 9976,
+       "EGG": 9724,
+       "MILK": 9724,
+       "WOOL": 9976,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 43,
+       "CARROT": 37,
+       "TOMATO": 67,
+       "STRAWBERRY": 303,
+       "MELON": 278,
+       "EGG": 67,
+       "MILK": 304,
+       "WOOL": 228,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 599,
+     "market": {
+      "inventory": {
+       "WHEAT": 9668,
+       "CARROT": 9966,
+       "TOMATO": 9935,
+       "STRAWBERRY": 9501,
+       "MELON": 9976,
+       "EGG": 9709,
+       "MILK": 9704,
+       "WOOL": 9976,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 43,
+       "CARROT": 38,
+       "TOMATO": 68,
+       "STRAWBERRY": 308,
+       "MELON": 278,
+       "EGG": 68,
+       "MILK": 310,
+       "WOOL": 228,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 600,
+     "market": {
+      "inventory": {
+       "WHEAT": 9663,
+       "CARROT": 9963,
+       "TOMATO": 9933,
+       "STRAWBERRY": 9495,
+       "MELON": 9975,
+       "EGG": 9705,
+       "MILK": 9699,
+       "WOOL": 9975,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 43,
+       "CARROT": 38,
+       "TOMATO": 68,
+       "STRAWBERRY": 309,
+       "MELON": 279,
+       "EGG": 68,
+       "MILK": 311,
+       "WOOL": 228,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 623,
+     "market": {
+      "inventory": {
+       "WHEAT": 9643,
+       "CARROT": 9953,
+       "TOMATO": 9928,
+       "STRAWBERRY": 9470,
+       "MELON": 9975,
+       "EGG": 9690,
+       "MILK": 9679,
+       "WOOL": 9975,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 44,
+       "CARROT": 39,
+       "TOMATO": 69,
+       "STRAWBERRY": 313,
+       "MELON": 279,
+       "EGG": 69,
+       "MILK": 316,
+       "WOOL": 228,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 624,
+     "market": {
+      "inventory": {
+       "WHEAT": 9638,
+       "CARROT": 9950,
+       "TOMATO": 9926,
+       "STRAWBERRY": 9464,
+       "MELON": 9974,
+       "EGG": 9686,
+       "MILK": 9674,
+       "WOOL": 9974,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 44,
+       "CARROT": 39,
+       "TOMATO": 69,
+       "STRAWBERRY": 314,
+       "MELON": 279,
+       "EGG": 69,
+       "MILK": 317,
+       "WOOL": 228,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 647,
+     "market": {
+      "inventory": {
+       "WHEAT": 9618,
+       "CARROT": 9940,
+       "TOMATO": 9921,
+       "STRAWBERRY": 9439,
+       "MELON": 9974,
+       "EGG": 9671,
+       "MILK": 9654,
+       "WOOL": 9974,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 45,
+       "CARROT": 40,
+       "TOMATO": 69,
+       "STRAWBERRY": 319,
+       "MELON": 279,
+       "EGG": 70,
+       "MILK": 322,
+       "WOOL": 228,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 648,
+     "market": {
+      "inventory": {
+       "WHEAT": 9613,
+       "CARROT": 9937,
+       "TOMATO": 9919,
+       "STRAWBERRY": 9433,
+       "MELON": 9973,
+       "EGG": 9667,
+       "MILK": 9649,
+       "WOOL": 9973,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 45,
+       "CARROT": 40,
+       "TOMATO": 70,
+       "STRAWBERRY": 320,
+       "MELON": 279,
+       "EGG": 70,
+       "MILK": 323,
+       "WOOL": 229,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 671,
+     "market": {
+      "inventory": {
+       "WHEAT": 9593,
+       "CARROT": 9927,
+       "TOMATO": 9914,
+       "STRAWBERRY": 9408,
+       "MELON": 9973,
+       "EGG": 9652,
+       "MILK": 9629,
+       "WOOL": 9973,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 45,
+       "CARROT": 41,
+       "TOMATO": 70,
+       "STRAWBERRY": 324,
+       "MELON": 279,
+       "EGG": 71,
+       "MILK": 327,
+       "WOOL": 229,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 672,
+     "market": {
+      "inventory": {
+       "WHEAT": 9588,
+       "CARROT": 9924,
+       "TOMATO": 9912,
+       "STRAWBERRY": 9402,
+       "MELON": 9972,
+       "EGG": 9648,
+       "MILK": 9624,
+       "WOOL": 9972,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 45,
+       "CARROT": 41,
+       "TOMATO": 71,
+       "STRAWBERRY": 325,
+       "MELON": 280,
+       "EGG": 72,
+       "MILK": 329,
+       "WOOL": 229,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 695,
+     "market": {
+      "inventory": {
+       "WHEAT": 9568,
+       "CARROT": 9914,
+       "TOMATO": 9907,
+       "STRAWBERRY": 9377,
+       "MELON": 9972,
+       "EGG": 9633,
+       "MILK": 9604,
+       "WOOL": 9972,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 46,
+       "CARROT": 42,
+       "TOMATO": 71,
+       "STRAWBERRY": 330,
+       "MELON": 280,
+       "EGG": 74,
+       "MILK": 333,
+       "WOOL": 229,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 696,
+     "market": {
+      "inventory": {
+       "WHEAT": 9563,
+       "CARROT": 9911,
+       "TOMATO": 9905,
+       "STRAWBERRY": 9371,
+       "MELON": 9971,
+       "EGG": 9629,
+       "MILK": 9599,
+       "WOOL": 9971,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 46,
+       "CARROT": 42,
+       "TOMATO": 71,
+       "STRAWBERRY": 331,
+       "MELON": 280,
+       "EGG": 75,
+       "MILK": 334,
+       "WOOL": 229,
+       "FERTILIZER": 100
+      }
+     }
+    },
+    {
+     "step": 719,
+     "market": {
+      "inventory": {
+       "WHEAT": 9543,
+       "CARROT": 9901,
+       "TOMATO": 9900,
+       "STRAWBERRY": 9346,
+       "MELON": 9971,
+       "EGG": 9614,
+       "MILK": 9579,
+       "WOOL": 9971,
+       "FERTILIZER": 10000
+      },
+      "prices": {
+       "WHEAT": 46,
+       "CARROT": 43,
+       "TOMATO": 72,
+       "STRAWBERRY": 335,
+       "MELON": 280,
+       "EGG": 77,
+       "MILK": 338,
+       "WOOL": 229,
+       "FERTILIZER": 100
+      }
+     }
+    }
+   ],
+   "note": "sampled at hour 0 and 23 each day; nobody sells anything"
+  }
+ },
+ "errors": {}
+}

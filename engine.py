@@ -22,143 +22,33 @@ Author: generated for local experimentation.
 
 from __future__ import annotations
 import math
+import os
 import random
+import sys
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
 # ---------------------------------------------------------------------------
-# Constants (Section 7)
+# Engine numbers live in kagfarm/constants.py, NOT here.
+#
+# The mirror and the shipped agent have to agree on every constant, or the tuning loop
+# optimises a different game from the one we submit into. So there is exactly one copy,
+# it lives in the package that ships, and the mirror imports it.
 # ---------------------------------------------------------------------------
 
-EPISODE_STEPS = 720
-TURNS_PER_DAY = 24
-BOARD_SIZE = 10
-STARTING_MONEY = 3000.0
-MAX_MARKET_ORDERS = 10
-SHED_CAPACITY = 100
-WEED_SPAWN_CHANCE = 0.005
-TOWN_SHOP_UNLOCK_INTERVAL_DAYS = 3
-TOWN_SHOP_SELL_INTERVAL_TURNS = 4
-TOWN_CENTER_SELL_INTERVAL_TURNS = 24
-FARM_HAND_COST_MULT = 1
-MAX_SHOP_INSTANCES = 8
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-LAND_PRICES = {"NE": 1000, "SW": 2000, "SE": 4000}  # BUY_LAND order
-
-SHED_TILES = {"NW": (4, 4), "NE": (5, 4), "SW": (4, 5), "SE": (5, 5)}
-FARMER_START = (4, 4)
-
-CROPS_ONE_TIME = ("WHEAT", "CARROT", "MELON")
-CROPS_ONGOING = ("TOMATO", "STRAWBERRY")
-ANIMALS = ("GOOSE", "COW", "SHEEP")
-ANIMAL_PRODUCT = {"GOOSE": "EGG", "COW": "MILK", "SHEEP": "WOOL"}
-ANIMAL_STRUCTURE = {"GOOSE": "COOP", "COW": "PASTURE", "SHEEP": "PASTURE"}
-
-# ---------------------------------------------------------------------------
-# Object table (Section 9.1)
-# ---------------------------------------------------------------------------
-
-OBJECT_TABLE = {
-    "WHEAT":      dict(seed_cost=10,  base_price=25,  first_yield_day=2,  max_yield_day=4,
-                        max_yield=6, max_yield_unfert=4, kind="one_time"),
-    "CARROT":     dict(seed_cost=20,  base_price=35,  first_yield_day=2,  max_yield_day=3,
-                        max_yield=4, max_yield_unfert=3, kind="one_time"),
-    "MELON":      dict(seed_cost=80,  base_price=250, first_yield_day=10, max_yield_day=10,
-                        max_yield=6, max_yield_unfert=6, kind="one_time"),
-    "TOMATO":     dict(seed_cost=50,  base_price=60,  sched_days=[8, 9, 10, 11],
-                        max_yield=4, kind="ongoing"),
-    "STRAWBERRY": dict(seed_cost=100, base_price=120, sched_days=[10, 12, 14, 16],
-                        max_yield=4, kind="ongoing"),
-    "GOOSE":      dict(buy_cost=300, product="EGG",  base_price=50,  first_yield_day=4,
-                        interval=1, max_held=4, structure="COOP"),
-    "COW":        dict(buy_cost=400, product="MILK", base_price=160, first_yield_day=8,
-                        interval=2, max_held=6, structure="PASTURE"),
-    "SHEEP":      dict(buy_cost=500, product="WOOL", base_price=200, first_yield_day=6,
-                        interval=3, max_held=6, structure="PASTURE"),
-    "FERTILIZER": dict(buy_cost=100, base_price=100),
-}
-
-# ---------------------------------------------------------------------------
-# Market price-curve params (Section 11.2) — resource -> curve spec
-# ---------------------------------------------------------------------------
-
-I0 = 10000
-
-MARKET_PARAMS = {
-    #                base  T    below_f    below_t  above_f  above_t
-    "WHEAT":      dict(base=25,  T=400, below_f="sqrt",  below_t=0.80, above_f="log",   above_t=0.20),
-    "CARROT":     dict(base=35,  T=450, below_f="hinge", below_t=1.00, above_f="sqrt",  above_t=0.70),
-    "TOMATO":     dict(base=60,  T=200, below_f="hinge", below_t=0.40, above_f="sqrt",  above_t=0.60),
-    "STRAWBERRY": dict(base=120, T=100, below_f="sqrt",  below_t=0.70, above_f="linear",above_t=1.60),
-    "MELON":      dict(base=250, T=300, below_f="log",   below_t=0.20, above_f="sq",    above_t=3.60),
-    "EGG":        dict(base=50,  T=332, below_f="hinge", below_t=0.40, above_f="log",   above_t=0.20),
-    "MILK":       dict(base=160, T=122, below_f="sqrt",  below_t=0.60, above_f="linear",above_t=1.60),
-    "WOOL":       dict(base=200, T=105, below_f="log",   below_t=0.20, above_f="sq",    above_t=3.20),
-    "FERTILIZER": dict(base=100, T=200, below_f="linear",below_t=0.40, above_f="linear",above_t=0.40),
-}
-
-SELLABLE = list(MARKET_PARAMS.keys())          # anything can be SELL'd
-BUYBACK  = {"WHEAT", "FERTILIZER"}              # only these support BUY_PRODUCT
-
-# ---------------------------------------------------------------------------
-# Town shops (Section 11.4)
-# ---------------------------------------------------------------------------
-
-SHOP_TABLE = {
-    "BAKERY":         {"EGG": 1, "WHEAT": 1},
-    "PIZZA_SHOP":      {"MILK": 1, "TOMATO": 1, "WHEAT": 1},
-    "BRUNCH_SPOT":     {"EGG": 1, "WHEAT": 1, "STRAWBERRY": 1},
-    "YARN_STORE":      {"WOOL": 2},
-    "ICE_CREAM_SHOP":  {"STRAWBERRY": 1, "MILK": 1, "WHEAT": 1},
-    "PET_CAFE":        {"CARROT": 2},
-    "SMOOTHIE_SHOP":   {"STRAWBERRY": 1, "MILK": 1},
-    "FARMERS_MARKET":  {"WHEAT": 1, "CARROT": 1, "TOMATO": 1, "STRAWBERRY": 1},
-}
-
-TOWN_CENTER_PRODUCTS = ["WHEAT", "CARROT", "TOMATO", "STRAWBERRY", "MELON", "EGG", "MILK", "WOOL"]
-
-
-def fib_hire_cost(n_already_hired_today: int) -> int:
-    """Cost of the (n+1)-th hire today. Sequence 1,1,2,3,5,8,13,21,34,55,..."""
-    a, b = 1, 1
-    for _ in range(n_already_hired_today):
-        a, b = b, a + b
-    return FARM_HAND_COST_MULT * a
-
-
-def _f(kind: str, x: float, T: float) -> float:
-    if kind == "linear":
-        return x
-    if kind == "sqrt":
-        return math.sqrt(max(0.0, x))
-    if kind == "sq":
-        return x * x
-    if kind == "log":
-        return math.log(1 + x)
-    if kind == "log10":
-        return math.log10(1 + x)
-    if kind == "hinge":
-        u = x / T
-        return u + 8 * max(0.0, u - 1) ** 2
-    raise ValueError(f"unknown curve {kind}")
-
-
-def price_for(resource: str, inventory: float) -> int:
-    p = MARKET_PARAMS[resource]
-    base, T = p["base"], p["T"]
-    diff = inventory - I0
-    if diff == 0:
-        return round(base)
-    if diff < 0:  # scarcity -> price up
-        f_kind, target = p["below_f"], p["below_t"]
-        sign = +1
-    else:  # glut -> price down
-        f_kind, target = p["above_f"], p["above_t"]
-        sign = -1
-    fT = _f(f_kind, T, T)
-    amp = target * base / fT if fT != 0 else 0
-    val = base + sign * amp * _f(f_kind, abs(diff), T)
-    return max(1, round(val))
+from kagfarm.constants import (  # noqa: E402
+    EPISODE_STEPS, TURNS_PER_DAY, SEASON_DAYS, BOARD_SIZE, STARTING_MONEY,
+    MAX_MARKET_ORDERS, SHED_CAPACITY, WEED_SPAWN_CHANCE,
+    TOWN_SHOP_UNLOCK_INTERVAL_DAYS, TOWN_SHOP_SELL_INTERVAL_TURNS,
+    TOWN_CENTER_SELL_INTERVAL_TURNS, FARM_HAND_COST_MULT, MAX_SHOP_INSTANCES,
+    LAND_PRICES, QUADRANT_ORDER, SHED_TILES, FARMER_START,
+    CROPS_ONE_TIME, CROPS_ONGOING, ANIMALS, ANIMAL_PRODUCT, ANIMAL_STRUCTURE,
+    OBJECT_TABLE, I0, MARKET_PARAMS, SELLABLE, BUYBACK,
+    SHOP_TABLE, TOWN_CENTER_PRODUCTS,
+    fib_hire_cost, hire_cost_total, price_for, _f,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -343,6 +233,22 @@ class KaggricultureEnv:
             op = hand_ops[i] if i < len(hand_ops) else ["PASS"]
             ops.append((i + 1, h, op))
 
+        # PLANT is all-or-nothing across units within a turn [real]: the engine validates the
+        # whole batch against the seed count before applying any of it, so one seed and two
+        # PLANT ops produce ZERO plants, not one. Modelled here so a planner regression that
+        # over-commits seeds shows up in eval instead of only on the ladder. Measured with
+        # /tmp/plant_probe.py over six episodes: 0 over-commits against 959 plantings, so this
+        # guard is currently inert -- which is the point of adding it while it is free.
+        want: dict[str, int] = {}
+        for _, _, op in ops:
+            if op and op[0] == "PLANT" and len(op) > 1:
+                want[op[1]] = want.get(op[1], 0) + 1
+        voided = {c for c, n in want.items() if n > f.seeds.get(c, 0)}
+        if voided:
+            ops = [(u, p, (["PASS"] if (o and o[0] == "PLANT" and len(o) > 1
+                                        and o[1] in voided) else o))
+                   for u, p, o in ops]
+
         for unit_idx, pos, op in ops:
             if not op:
                 continue
@@ -426,10 +332,19 @@ class KaggricultureEnv:
             if f.seeds.get(crop, 0) <= 0:
                 return
             f.seeds[crop] -= 1
+            spec = OBJECT_TABLE[crop]
+            # [real] one_time crops carry a hard expiry stamped at planting; ongoing crops
+            # carry -1 and expire after their last scheduled yield instead. Confirmed on every
+            # planted tile in calibration/real_engine/tutorial_episode.json: CARROT +96 turns,
+            # WHEAT +120, MELON +312 from planted_day * 24, and -1 for every TOMATO and
+            # STRAWBERRY regardless of when it went in.
+            life = spec.get("lifespan_days")
+            mls = (self.day + life) * TURNS_PER_DAY if life else -1
             f.tiles[y][x] = {
                 "kind": "PLANT", "crop": crop, "planted_day": self.day,
                 "watered_today": False, "consecutive_unwatered": 1,
-                "yield_units": 0, "max_lifespan_step": -1, "fertilized_until_day": -1,
+                "yield_units": spec.get("start_yield", 0),
+                "max_lifespan_step": mls, "fertilized_until_day": -1,
                 "_sched_done": 0,  # internal: scheduled productions completed (ongoing crops)
                 "_decaying": False,
             }
@@ -437,15 +352,35 @@ class KaggricultureEnv:
 
         if name == "WATER":
             if isinstance(tile, dict) and tile.get("kind") == "PLANT":
-                tile["watered_today"] = True
+                # [real] The yield bonus is granted HERE, inside the action, not at the
+                # midnight refresh: at steps 144->145 of the tutorial replay a melon goes
+                # 1 -> 2 units on the same turn its WATER is applied, at day 6 hour 1. All
+                # eleven yield increases in that episode coincide with a WATER on that tile,
+                # at whatever hour the farmer happened to arrive. So a unit is harvestable
+                # the same day it is watered, and every one-time cycle is a full day shorter
+                # than an end-of-day model predicts.
+                #
+                # Guarded on `watered_today` so a second hand watering the same tile in the
+                # same turn is a no-op. The real engine's behaviour with duplicate waterings
+                # is not observable in the replay; idempotence is the conservative choice,
+                # because the alternative invents a "water one melon six times" exploit that
+                # the planner would happily find and the real engine would not honour.
+                if not tile["watered_today"]:
+                    tile["watered_today"] = True
+                    self._grant_yield(tile)
             return
 
         if name == "HARVEST":
             if isinstance(tile, dict) and tile.get("kind") == "PLANT" and tile.get("yield_units", 0) > 0:
                 crop = tile["crop"]
+                spec = OBJECT_TABLE[crop]
+                # KT doc: HARVEST before first_yield_day is a no-op even if yield_units > 0.
+                # This matters because WHEAT starts at yield_units=1.
+                first = spec.get("first_yield_day", spec.get("sched_days", [0])[0])
+                if self.day - tile["planted_day"] < first:
+                    return
                 n = tile["yield_units"]
                 inv[crop] = inv.get(crop, 0) + n
-                spec = OBJECT_TABLE[crop]
                 if spec["kind"] == "one_time":
                     f.tiles[y][x] = None
                 else:
@@ -662,9 +597,17 @@ class KaggricultureEnv:
 
     def _day_refresh(self):
         new_day = self.day  # self.t already advanced past midnight
-        # unlock a new shop every N days, cap 8
+        # Unlock a new shop every N days, cap 8, sampled WITHOUT replacement.  [real]
+        # The replay unlocks ICE_CREAM_SHOP, YARN_STORE, BRUNCH_SPOT, SMOOTHIE_SHOP,
+        # PIZZA_SHOP, PET_CAFE, BAKERY, FARMERS_MARKET on days 3,6,...,24 — all eight types,
+        # no repeats. Under the with-replacement draw this used to do, eight distinct draws
+        # from eight types has probability 8!/8^8 = 0.24%, so the real engine is permuting.
+        # This is not a cosmetic fix: with replacement the expected number of distinct shops
+        # by day 24 is 5.2, not 8, so the mirror was understating late-season demand for
+        # everything in the baskets by roughly a third.
         if new_day % TOWN_SHOP_UNLOCK_INTERVAL_DAYS == 0 and new_day > 0 and len(self.shops) < MAX_SHOP_INSTANCES:
-            self.shops.append(self.rng.choice(list(SHOP_TABLE.keys())))
+            remaining = [s for s in SHOP_TABLE if s not in self.shops]
+            self.shops.append(self.rng.choice(remaining or list(SHOP_TABLE.keys())))
 
         for f in self.farms:
             # dump every unit's inventory into the shed
@@ -696,12 +639,44 @@ class KaggricultureEnv:
             f.farmer = list(FARMER_START)
             f.inventories = [{}]  # farmer only; hand inventories are recreated on hire
 
+    def _grant_yield(self, tile: dict):
+        """Add the watering bonus to a plant, at the moment WATER is applied.  [real]
+
+        The gain window is `bonus_start..bonus_end` for one-time crops, which is NOT the same
+        as `first_yield_day..max_yield_day`. They coincide for wheat and carrot, and they are
+        6..12 versus 10..10 for melon: the replay shows melon gaining +1 at ages 6, 7, 8, 9
+        and 10 and reaching its cap of 6 on the day HARVEST first becomes legal, then holding
+        6 through ages 11 and 12 while the tutorial agent waited. `first_yield_day` gates the
+        harvest, not the growth.
+
+        Gains depend only on watering today and on the age, not on any streak: the one carrot
+        gain in the replay landed with `consecutive_unwatered = 1`.
+        """
+        spec = OBJECT_TABLE[tile["crop"]]
+        age = self.day - tile["planted_day"]
+        fertilized = tile["fertilized_until_day"] >= self.day
+        gain = 2 if fertilized else 1
+
+        if spec["kind"] == "one_time":
+            if not (spec["bonus_start"] <= age <= spec["bonus_end"]):
+                return
+            cap = spec["max_yield"] if fertilized else spec["max_yield_unfert"]
+            tile["yield_units"] = min(cap, tile["yield_units"] + gain)
+        else:
+            sched = spec["sched_days"]
+            if age not in sched or tile["_sched_done"] >= len(sched):
+                return
+            # `max_yield` caps STANDING units, not lifetime ones, so an ongoing crop that is
+            # harvested between scheduled yields collects more than the cap over its life.
+            tile["yield_units"] = min(spec["max_yield"], tile["yield_units"] + gain)
+            tile["_sched_done"] += 1
+
     def _refresh_plant(self, f: Farm, x: int, y: int, tile: dict):
-        crop = tile["crop"]
-        spec = OBJECT_TABLE[crop]
-        age = self.day - tile["planted_day"]  # age *after* today's day increments (i.e. days survived)
+        """Midnight bookkeeping: thirst, then expiry. Growth happens in WATER, not here."""
+        spec = OBJECT_TABLE[tile["crop"]]
+        age = self.day - tile["planted_day"]  # self.day has already rolled: days survived
         watered = tile["watered_today"]
-        fertilized = tile["fertilized_until_day"] >= self.day - 1  # bonus applied on the day that just ended
+        tile["watered_today"] = False
 
         if not watered:
             tile["consecutive_unwatered"] += 1
@@ -712,36 +687,28 @@ class KaggricultureEnv:
             f.tiles[y][x] = {"kind": "WEED"}
             return
 
-        if spec["kind"] == "one_time":
-            first, last = spec["first_yield_day"], spec["max_yield_day"]
-            cap = spec["max_yield"] if fertilized else spec["max_yield_unfert"]
-            if watered and first <= age <= last:
-                gain = 2 if fertilized else 1
-                tile["yield_units"] = min(cap, tile["yield_units"] + gain)
-            if age > last:
-                # past peak: decays if unharvested, one unit every other day
-                if age % 2 == 0 and tile["yield_units"] > 0:
-                    tile["yield_units"] -= 1
-                if tile["yield_units"] <= 0 and age > last + 2:
-                    f.tiles[y][x] = {"kind": "WEED"}
-        else:  # ongoing
-            sched = spec["sched_days"]
-            if age in sched and watered:
-                gain = 2 if fertilized else 1
-                tile["yield_units"] = min(spec["max_yield"], tile["yield_units"] + gain)
-                tile["_sched_done"] += 1
-            if tile["_sched_done"] >= len(sched):
-                # lifespan complete -> begin decay
-                if tile.get("_decaying"):
-                    if age % 2 == 0 and tile["yield_units"] > 0:
-                        tile["yield_units"] -= 1
-                    if tile["yield_units"] <= 0:
-                        f.tiles[y][x] = {"kind": "WEED"}
-                        return
-                elif age > sched[-1]:
-                    tile["_decaying"] = True
+        # [real] Hard expiry for one-time crops. The replay's single observed case: a carrot
+        # with max_lifespan_step 120 was alive at step 120 hour 0 holding 2 units, lost one at
+        # step 121 and was WEED by step 123 — so past the stamp an unharvested crop rots away
+        # over about three turns and leaves a weed to dig. Modelled as a kill at the midnight
+        # itself, which is up to three turns early. That is deliberate: the alternative hands
+        # the planner an hour-0-to-hour-3 grace window to schedule harvests into, and if the
+        # real engine's rot is even slightly faster the whole harvest is lost. The rule the
+        # planner should obey is the same either way — a one-time crop must be harvested by the
+        # end of age `lifespan_days - 1`, and every row of CROP_PLAN does.
+        mls = tile.get("max_lifespan_step", -1)
+        if mls >= 0 and self.t >= mls:
+            f.tiles[y][x] = {"kind": "WEED"}
+            return
 
-        tile["watered_today"] = False
+        if spec["kind"] != "one_time":
+            # Ongoing crops carry mls = -1 and expire once their schedule is exhausted. The
+            # replay never kept a tomato or strawberry alive to its first scheduled yield, so
+            # the timing here is [doc] only; WEED-on-completion is the conservative reading
+            # because it forces the planner to harvest the last yield promptly.
+            sched = spec["sched_days"]
+            if tile["_sched_done"] >= len(sched) and age > sched[-1]:
+                f.tiles[y][x] = {"kind": "WEED"}
 
     def _refresh_animal(self, f: Farm, tile: dict):
         animal = tile["animal"]
