@@ -205,16 +205,32 @@ One measured constraint the router has to respect: `PLANT` creates a tile with
 `consecutive_unwatered = 1`, so **a plant that is not watered on the day it goes in dies at
 that midnight**. Planting and watering are one atomic job, not two independent ones.
 
-### 2.6 Logistics are free if you exploit the midnight dump
+### 2.6 Logistics are free for 27 days a season, and cost $12k on the other three
 
 Seeds live in an uncapped slot that `PLANT` draws from directly, and every unit's carried
 inventory auto-dumps into the shed at midnight. So a unit never needs to walk to the shed
 to plant or to deliver a harvest — only to collect fertilizer or wheat for feeding.
 
-The binding logistics constraint is instead the **100-item shed cap**, since midnight
-overflow is silently discarded. Sell the shed down to empty each day and you can absorb
-~100 harvested items per night. Selling itself is nearly free: 10 orders per turn × 24
-turns, and each order carries any quantity.
+**That was the original claim in this section and it was wrong in the way that cost the most
+money in the project.** `SELL` settles from the shed and `HARVEST` fills the acting unit's own
+bag, so produce is worth nothing until somebody walks it home. The midnight dump does that for
+free only while the shed has room for it, and for 27 days it does: occupancy peaks in the
+thirties. Then the last strawberry cohort ripens all at once. Measured over six episodes,
+**74 of the 75 items destroyed per episode died in a single midnight dump on day 28**; on seed 5,
+142 strawberries — about **$40k at that turn's price** — went in one `_add_shed` call, while the
+`SELL STRAWBERRY 215` issued that same turn settled 23 because the other 196 were in bags.
+
+The fix is in `policy.py`: `_unit_ops` interrupts a run to deliver when `shed + all bags` exceeds
+two shed-loads and the acting unit carries 18+ items, and `endgame_days` opens the taps five days
+out rather than two. Panel mean $73.6k → $85.9k, p10 $58.0k → $74.7k, replicated on held-out
+seeds. The threshold is deliberately loose: hauling whenever the shed passed 55% drove items
+destroyed to exactly zero and the **mean down to $64.0k**, because on the 27 quiet days the
+commute is pure loss. `lost` is a diagnostic, not the objective.
+
+The binding logistics constraint is still the **100-item shed cap**, since overflow is silently
+discarded. Sell the shed down to empty each day and you can absorb ~100 harvested items per
+night. Selling itself is nearly free: 10 orders per turn × 24 turns, and each order carries any
+quantity — but only against what is *in the shed* at the moment the order settles.
 
 ### 2.7 Per-crop yields, measured off the engine rather than from the formula
 

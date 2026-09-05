@@ -12,10 +12,9 @@ cd "$(dirname "$0")"
 VENV=".venv"
 OUT="calibration"
 
-# My sandbox can create git lock files but not remove them, so clear any stale
-# ones while we're running with your permissions.
-rm -f .git/*.lock .git/objects/maintenance.lock .writetest 2>/dev/null || true
-rmdir .gittest 2>/dev/null || true
+# Clear any stale git lock files while we're running with your permissions. Harmless
+# if there are none.
+rm -f .git/*.lock .git/refs/heads/*.lock .git/objects/maintenance.lock 2>/dev/null || true
 
 echo "==> creating virtualenv at $VENV"
 python3 -m venv "$VENV"

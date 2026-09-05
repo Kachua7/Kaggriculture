@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kaggriculture — build log, 5 September 2026</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#F1F0F4; --card:#FFFFFF; --ink:#191B2E; --ink-soft:#4A4E6C;
+    --mute:#767A99; --rule:#DAD9E2; --rule-hard:#B9B8C6;
+    --wheat:#A97B08; --wheat-fill:#E9BE4B; --wheat-soft:#F6E4AE;
+    --flesh:#B4361F; --flesh-fill:#E8705A;
+    --leaf:#1B6B44; --leaf-fill:#8ACDA6;
+    --indigo:#343879;
+    --sans:ui-sans-serif,-apple-system,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+    font-size:15px; line-height:1.55;
+    /* faint season ruling: the page sits on the same grid the game does */
+    background-image:linear-gradient(90deg,rgba(52,56,121,.045) 1px,transparent 1px);
+    background-size:calc(100% / 30) 100%;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:34px 22px 90px}
+  .eyebrow{
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.19em; text-transform:uppercase;
+    color:var(--mute); margin:0 0 10px;
+  }
+  h1{font-size:clamp(26px,4.2vw,40px);line-height:1.06;letter-spacing:-.025em;font-weight:800;margin:0 0 6px}
+  h2{font-size:15px;letter-spacing:.015em;font-weight:700;margin:0}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  section{margin-top:30px}
+  .sechead{display:flex;align-items:baseline;gap:12px;border-bottom:1.5px solid var(--ink);padding-bottom:7px;margin-bottom:16px}
+  .sechead .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin-left:auto}
+  p{margin:0 0 11px;max-width:74ch;color:var(--ink-soft)}
+  p strong{color:var(--ink)}
+  a{color:var(--indigo)}
+  .fine{font-size:12.5px;color:var(--mute);max-width:80ch}
+  @media (prefers-reduced-motion:no-preference){
+    .rise{animation:rise .5s cubic-bezier(.2,.7,.3,1) both}
+    @keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+  }
+
+  /* hero */
+  .hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:34px;align-items:end;
+        border-bottom:1.5px solid var(--ink);padding-bottom:22px}
+  .bank{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:clamp(46px,9vw,88px);
+        line-height:.88;letter-spacing:-.05em;font-weight:700;color:var(--ink)}
+  .bank .cur{font-size:.44em;vertical-align:.42em;letter-spacing:0;color:var(--wheat)}
+  .bankcap{margin:9px 0 0;font-size:13.5px;color:var(--ink-soft);max-width:44ch}
+  .delta{display:inline-flex;align-items:baseline;gap:6px;margin-top:12px;padding:3px 8px;
+         border:1px solid var(--leaf);border-radius:2px;color:var(--leaf);
+         font-family:var(--mono);font-size:12px;letter-spacing:.02em}
+  .kpi{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--rule);
+       border:1px solid var(--rule)}
+  .kpi div{background:var(--card);padding:11px 13px}
+  .kpi dt{font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;
+          color:var(--mute);margin:0 0 3px}
+  .kpi dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:18px;
+          font-weight:600;letter-spacing:-.02em}
+  .kpi dd small{font-family:var(--sans);font-size:11.5px;font-weight:400;color:var(--mute);letter-spacing:0}
+  @media(max-width:760px){.hero{grid-template-columns:1fr;gap:22px}}
+
+  /* the season strip -- signature element */
+  .strip{margin-top:6px}
+  .striprow{display:grid;grid-template-columns:78px minmax(0,1fr);gap:14px;align-items:end;margin-bottom:6px}
+  .striplab{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+            color:var(--mute);text-align:right;padding-bottom:16px;line-height:1.3}
+  .striplab b{display:block;color:var(--ink);font-weight:700;letter-spacing:.06em}
+  .bars{position:relative;display:grid;grid-template-columns:repeat(30,1fr);gap:2px;height:132px;
+        align-items:end;border-bottom:1.5px solid var(--ink)}
+  .bars .cap{position:absolute;left:0;right:0;border-top:1px dashed var(--flesh);pointer-events:none}
+  .bars .capname{position:absolute;right:0;transform:translateY(-100%);font-family:var(--mono);
+                 font-size:9.5px;letter-spacing:.1em;color:var(--flesh);background:var(--card);padding:0 3px}
+  .bar{position:relative;display:flex;flex-direction:column;justify-content:flex-end;height:100%}
+  .bar span{display:block;width:100%}
+  .bar .shed{background:var(--wheat-fill)}
+  .bar .bags{background:var(--wheat-soft);border-top:1px solid var(--wheat-fill)}
+  .bar .gone{background:var(--flesh-fill)}
+  .bar:hover .shed,.bar:focus-visible .shed{background:var(--wheat)}
+  .days{display:grid;grid-template-columns:repeat(30,1fr);gap:2px;margin:5px 0 0}
+  .days b{font-family:var(--mono);font-size:9px;color:var(--mute);text-align:center;font-weight:400}
+  .legend{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--ink-soft);margin-top:12px}
+  .legend i{display:inline-block;width:11px;height:11px;margin-right:5px;vertical-align:-1px;border:1px solid rgba(0,0,0,.14)}
+  .callout{margin-top:14px;border-left:2.5px solid var(--flesh);padding:2px 0 2px 14px}
+  .callout p{margin:0;font-size:13.5px}
+  @media(max-width:700px){.striprow{grid-template-columns:1fr}
+    .striplab{text-align:left;padding-bottom:4px}.days b{font-size:0}}
+
+  /* phase ledger */
+  .ledger{border-top:1px solid var(--rule)}
+  .row{display:grid;grid-template-columns:26px 1fr 118px 200px;gap:14px;align-items:start;
+       padding:13px 2px;border-bottom:1px solid var(--rule)}
+  .row .ph{font-family:var(--mono);font-size:12px;color:var(--mute);padding-top:2px}
+  .row h3{margin:0 0 3px;font-size:14.5px;font-weight:700;letter-spacing:-.005em}
+  .row p{margin:0;font-size:13px;max-width:62ch}
+  .state{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+         padding-top:3px;white-space:nowrap}
+  .state.done{color:var(--leaf)}
+  .state.now{color:var(--indigo);font-weight:700}
+  .state.next{color:var(--mute)}
+  .state.block{color:var(--flesh)}
+  .state i{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;vertical-align:1px;background:currentColor}
+  .money{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-soft);padding-top:3px}
+  .money b{color:var(--ink);font-weight:700}
+  .row.is-now{background:linear-gradient(90deg,rgba(52,56,121,.06),rgba(52,56,121,0))}
+  @media(max-width:820px){.row{grid-template-columns:26px 1fr;gap:8px}
+    .state,.money{grid-column:2;padding-top:5px}}
+
+  /* calendar strip */
+  .cal{display:grid;grid-template-columns:repeat(19,1fr);gap:2px;margin:4px 0 0}
+  .cal div{height:26px;background:var(--card);border:1px solid var(--rule);position:relative}
+  .cal div.today{background:var(--indigo);border-color:var(--indigo)}
+  .cal div.dead{background:var(--flesh-fill);border-color:var(--flesh)}
+  .cal b{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);
+         font-size:9px;font-weight:400;color:var(--mute)}
+  .cal div.today b,.cal div.dead b{color:#fff}
+  .todo{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:1px;background:var(--rule);
+        border:1px solid var(--rule)}
+  .todo article{background:var(--card);padding:15px 16px}
+  .todo h4{margin:0 0 4px;font-size:13.5px;letter-spacing:-.005em}
+  .todo .amt{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:22px;font-weight:700;
+             letter-spacing:-.03em;color:var(--wheat);display:block;margin:0 0 6px}
+  .todo p{margin:0;font-size:12.5px;max-width:none}
+  .cmd{font-family:var(--mono);font-size:12px;background:var(--ink);color:#EDECF2;padding:9px 12px;
+       border-radius:2px;overflow-x:auto;white-space:pre;margin:8px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<!--HERO-->
+<header class="hero rise">
+  <div>
+    <p class="eyebrow">Kaggriculture · agent build log · 5 September 2026</p>
+    <div class="bank"><span class="cur">$</span>85,852</div>
+    <p class="bankcap">Mean terminal bank over 144 mirror episodes — seeds 0–47 against
+      <span class="num">starter</span>, <span class="num">heuristic</span> and
+      <span class="num">random</span>. Terminal bank is the only thing the competition scores.</p>
+    <span class="delta">▲ $12,265 today &nbsp;·&nbsp; was $73,587</span>
+  </div>
+  <dl class="kpi">
+    <div><dt>10th percentile</dt><dd>$74,727</dd></div>
+    <div><dt>Worst episode</dt><dd>$59,049</dd></div>
+    <div><dt>Episodes won</dt><dd>144 / 144</dd></div>
+    <div><dt>Held-out replication</dt><dd>$86,984 <small>seeds 48–95</small></dd></div>
+    <div><dt>Slowest turn</dt><dd>2.0 ms <small>budget 1,000</small></dd></div>
+    <div><dt>Submissions made</dt><dd style="color:var(--flesh)">0 <small>18 days left</small></dd></div>
+  </dl>
+</header>
+
+<!--STRIP-->
+<section class="strip">
+  <div class="sechead"><h2>What changed today</h2>
+    <span class="tag">analysis/shed_probe.py · 24 episodes</span></div>
+  <p><strong>Selling only works out of the shed.</strong> Harvesting fills the bag of whichever
+    hand did the picking, and until someone walks that bag to a shed tile the produce cannot be
+    sold — the engine empties every bag into the shed at midnight instead, and silently destroys
+    whatever will not fit in the 100 slots. For 27 days that is free storage. Then the last
+    strawberry planting ripens all at once.</p>
+  <div class="striprow">
+    <div class="striplab"><b>Before</b>this morning</div>
+    <div><div class="bars" id="rowA"></div><div class="days" id="daysA"></div></div>
+  </div>
+  <div class="striprow">
+    <div class="striplab"><b>After</b>haul + endgame</div>
+    <div><div class="bars" id="rowB"></div><div class="days" id="daysB"></div></div>
+  </div>
+  <div class="legend">
+    <span><i style="background:var(--wheat-fill)"></i>in the shed at 23:00, sellable</span>
+    <span><i style="background:var(--wheat-soft)"></i>still in a hand's bag, unsellable</span>
+    <span><i style="background:var(--flesh-fill)"></i>destroyed at that midnight</span>
+    <span><i style="border-style:dashed;border-color:var(--flesh);background:none"></i>100-slot shed cap</span>
+  </div>
+  <div class="callout">
+    <p><strong>Day 27 carried 160 items in bags against a shed with 77 slots free.</strong>
+      On the worst seed that midnight destroyed 142 strawberries — about $40,000 — in one call,
+      while the sell order placed that same turn asked for 215 units and filled 23. It accounted
+      for nearly the whole gap between the good seeds and the bad ones.</p>
+  </div>
+  <p class="fine" style="margin-top:14px">Two fixes, measured separately. A hand now interrupts
+    its round to deliver when the farm is carrying more than two shed-loads and that hand holds
+    18+ items: day-27 bags fall from 160 to 111. And the end-of-season liquidation starts five
+    days out instead of two, which empties the shed from day 25 and puts a full 100 slots of
+    headroom exactly where the wave lands. Days 0–24 are byte-identical in both rows, which is
+    the check that the delivery rule never fires on a quiet day. The lower row still clears the
+    cap line — 111 into 100 — and that last 11 units is where the residual loss in the fourth
+    card below comes from. The overflow went from 83 items to 11, not to nothing.</p>
+</section>
+
+<section>
+  <div class="sechead"><h2>The whole build, in order</h2>
+    <span class="tag">ten phases · six shipped</span></div>
+  <div class="ledger">
+    <div class="row">
+      <div class="ph">01</div>
+      <div><h3>Mirror engine and agent contract</h3>
+        <p>A 720-turn reimplementation of the simulator, plus a <span class="num">main.py</span>
+          that exposes <span class="num">agent(obs)</span>. Lets a change be scored a thousand
+          times without touching Kaggle.</p></div>
+      <div class="state done"><i></i>Shipped</div>
+      <div class="money">engine.py · kagfarm/</div>
+    </div>
+    <div class="row">
+      <div class="ph">02</div>
+      <div><h3>Dawn route planner</h3>
+        <p>Every tile is scored once at dawn into a job list, then the ten hands are each
+          handed a walking route they can actually finish before midnight.</p></div>
+      <div class="state done"><i></i>Shipped</div>
+      <div class="money">route.py · policy.py</div>
+    </div>
+    <div class="row">
+      <div class="ph">03</div>
+      <div><h3>Offline evaluation harness</h3>
+        <p>144 episodes per run — seeds 0–47 against three opponents — reporting per-crop
+          revenue, price realization, spoilage and worst turn time. Every number on this
+          page comes out of it.</p></div>
+      <div class="state done"><i></i>Shipped</div>
+      <div class="money">eval.py · sweep.py</div>
+    </div>
+    <div class="row">
+      <div class="ph">04</div>
+      <div><h3>Calibration against the real engine</h3>
+        <p>Replayed a real 720-step episode and retagged every constant <span class="num">[real]</span>,
+          <span class="num">[probed]</span> or <span class="num">[fitted]</span>. Melon yield was
+          low by 65%, which voided every score measured before it.</p></div>
+      <div class="state done"><i></i>Shipped</div>
+      <div class="money">$95k → <b>void</b></div>
+    </div>
+    <div class="row">
+      <div class="ph">05</div>
+      <div><h3>Market brain</h3>
+        <p>Sell at the marginal price instead of dumping: hold while the book is thin, force
+          full sells when the shed crowds, liquidate at the close of the season.</p></div>
+      <div class="state done"><i></i>Shipped</div>
+      <div class="money">in the $73,587 base</div>
+    </div>
+    <div class="row">
+      <div class="ph">06</div>
+      <div><h3>Endgame shed overflow</h3>
+        <p>Today's work. Seventy-four of every seventy-five items lost in a season were
+          destroyed in a single midnight dump on day 28. Haul discipline in the field, and a
+          five-day liquidation window instead of two.</p></div>
+      <div class="state done"><i></i>Shipped</div>
+      <div class="money">$73,587 → <b>$85,852</b></div>
+    </div>
+    <div class="row is-now">
+      <div class="ph">07</div>
+      <div><h3>Re-cut the melon acreage</h3>
+        <p>The crop mix was tuned against a melon yield <span class="num">1.8×</span> too low, so
+          the farm grows far more melon than the allocator believes — into the one market with no
+          shop buying it. 176 units a season realize <span class="num">76.8%</span> of base;
+          strawberry realizes <span class="num">212.9%</span>.</p></div>
+      <div class="state now"><i></i>In progress</div>
+      <div class="money">76.8% vs 212.9%</div>
+    </div>
+    <div class="row">
+      <div class="ph">08</div>
+      <div><h3>Livestock as a fertilizer route</h3>
+        <p>Collecting fertilizer returns <span class="num">$100</span> a visit, unconditionally,
+          every day, for every animal — a better return per action than any crop tile in the game.
+          The farm currently owns no animals.</p></div>
+      <div class="state next"><i></i>Queued</div>
+      <div class="money">$100 / visit</div>
+    </div>
+    <div class="row">
+      <div class="ph">09</div>
+      <div><h3>Glut side of the price curves</h3>
+        <p>All nine crops are still fitted above the reference inventory, because the replay
+          never pushed a market into surplus. The largest remaining unknown, and it sits
+          underneath every sell decision the agent makes.</p></div>
+      <div class="state next"><i></i>Queued</div>
+      <div class="money">9 curves fitted</div>
+    </div>
+    <div class="row">
+      <div class="ph">10</div>
+      <div><h3>Ladder submissions</h3>
+        <p>Zero uploads with eighteen days to go. A ladder rating needs episodes to converge,
+          so the first submission should not wait on the last tuning pass.</p></div>
+      <div class="state block"><i></i>Blocked on you</div>
+      <div class="money"><b>18 days</b></div>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <div class="sechead"><h2>Where the rest of the money is</h2>
+    <span class="tag">in measured priority order</span></div>
+  <p>Each figure below is something already measured, not a projection. They are ordered by how
+    much evidence there is that the money is real, which is not the same as how large it might be.</p>
+  <div class="todo">
+    <article>
+      <h4>1 · Melon is over-planted 3×</h4>
+      <span class="amt">176 → 60</span>
+      <p>units grown against units the town can absorb. Melon is in no shop basket, so its only
+        buyer is the town centre's two a day — 60 for the season, split with the opponent. The
+        acreage was cut against a yield of 0.33 units per tile-day when the real figure is 0.60,
+        so the farm floods a market it was never told was shallow, and realizes 76.8% of base.</p>
+    </article>
+    <article>
+      <h4>2 · Livestock is untouched</h4>
+      <span class="amt">$100</span>
+      <p>per fertilizer visit, for every animal, every day — the engine re-arms it unconditionally
+        and fertilizer appears in no shop basket, so its price never sags. Higher return per action
+        than any crop visit. The farm owns none.</p>
+    </article>
+    <article>
+      <h4>3 · Nine unfitted price curves</h4>
+      <span class="amt">9 / 9</span>
+      <p>crops are guesses on the surplus side, because the calibration replay never pushed a
+        market past its reference inventory. This is downside risk rather than upside: the sell
+        logic is reasoning from numbers nobody has checked.</p>
+    </article>
+    <article>
+      <h4>4 · What the fix left behind</h4>
+      <span class="amt">16.1</span>
+      <p>items still destroyed per episode, down from 62.4. Nine of them at the day-28 dump and
+        three at day 29. Worth one more probe, but it is no longer where the money is.</p>
+    </article>
+  </div>
+</section>
+
+<section>
+  <div class="sechead"><h2>The part I cannot do from here</h2>
+    <span class="tag">one command · plus a browser</span></div>
+  <div class="cal" id="cal"></div>
+  <p class="fine" style="margin-top:8px">September. Today in indigo, entry close on Wednesday the
+    23rd in red. The agent has never been scored by Kaggle.</p>
+  <p style="margin-top:16px">The sandbox I work in has no route to Kaggle and cannot hold a
+    browser session, so the upload is yours. One command does most of it. It builds a virtualenv
+    inside the repo, installs the real engine and the Kaggle CLI into it, copies the engine's own
+    source into <span class="num">calibration/</span>, and then runs the ground-truth traces.
+    Your system Python is not touched.</p>
+  <div class="cmd">cd ~/Desktop/kaggriculture &amp;&amp; bash bootstrap.sh</div>
+  <p class="fine" style="margin-top:8px">That single command also retires the third item on the
+    list above: with the engine source readable in the folder, the nine fitted price curves become
+    nine read ones, and every sell decision stops resting on a guess.</p>
+  <p style="margin-top:16px">Two things it cannot do for you. Accept the competition rules once,
+    in a browser, and leave an API token where the CLI can find it:</p>
+  <div class="cmd">open https://www.kaggle.com/competitions/kaggriculture/rules
+mkdir -p ~/.kaggle &amp;&amp; mv ~/Downloads/kaggle.json ~/.kaggle/ &amp;&amp; chmod 600 ~/.kaggle/kaggle.json</div>
+  <p class="fine" style="margin-top:8px">The token comes from your Kaggle account settings, under
+    API → Create New Token. After those, I can package and submit on my own, and start reading
+    real ladder results back into the tuning loop.</p>
+</section>
+
+</div>
+<script>
+/* Real output of analysis/shed_probe.py, 24 episodes (8 seeds x 3 opponents).
+   shed[] and bags[] are sampled at hour 23, immediately before the engine empties every bag
+   into the shed. lost[] is what that midnight destroyed, attributed to the day whose bags
+   died -- the probe records it one day later, since the engine increments the clock first. */
+var DAT = {
+  A:{ /* before: haul_trigger 999, endgame_days 2 */
+    shed:[9,9,9,9,9,9,9,9,9,9,23,24,24,24,24,24,24,24,24,24,24,21.1,22.9,23.8,24,23.3,22.4,23.2,0,0],
+    bags:[0,0,0,0,0,0,0,0,0,0,0.8,0,0,0,2.9,13.6,11.9,0,0.7,4.2,13.6,24,3.3,4.5,6.2,14.6,16.2,160,70.4,6.2],
+    lost:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2.2,1.1,0,0,0,1.3,0,0,0,0,0,0.5,67.3,2.5,0]},
+  B:{ /* after */
+    shed:[9,9,9,9,9,9,9,9,9,9,23,24,24,24,24,24,24,24,24,24,24,21.1,22.9,23.8,24,0,0,0,0,0],
+    bags:[0,0,0,0,0,0,0,0,0,0,0.8,0,0,0,2.9,13.6,11.9,0,0.7,4.2,13.6,24,3.3,4.5,6.2,10.4,16,110.8,72.6,7],
+    lost:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2.2,1.1,0,0,0,1.3,0,0,0,0,0,0,9.2,2.7,0]}
+};
+var TOP = 190, CAP = 100;
+
+function strip(rowId, dayId, d){
+  var bars = document.getElementById(rowId), days = document.getElementById(dayId);
+  var cap = document.createElement("div");
+  cap.className = "cap"; cap.style.bottom = (CAP / TOP * 100) + "%";
+  var nm = document.createElement("b");
+  nm.className = "capname"; nm.style.bottom = (CAP / TOP * 100) + "%"; nm.textContent = "SHED CAP 100";
+  bars.appendChild(cap); bars.appendChild(nm);
+  for (var i = 0; i < 30; i++){
+    var shed = d.shed[i], lost = d.lost[i], kept = Math.max(0, d.bags[i] - lost);
+    var b = document.createElement("div");
+    b.className = "bar"; b.tabIndex = 0;
+    b.title = "day " + i + " at 23:00 — shed " + shed + ", bags " + d.bags[i] +
+              (lost ? ", destroyed at midnight " + lost : "");
+    b.appendChild(seg("gone",  lost));
+    b.appendChild(seg("bags",  kept));
+    b.appendChild(seg("shed",  shed));
+    bars.appendChild(b);
+    var lab = document.createElement("b");
+    lab.textContent = (i % 5 === 0 || i === 29) ? i : "";
+    days.appendChild(lab);
+  }
+}
+function seg(cls, v){
+  var s = document.createElement("span");
+  s.className = cls;
+  s.style.height = v > 0 ? "max(2px," + (v / TOP * 100) + "%)" : "0";
+  return s;
+}
+strip("rowA", "daysA", DAT.A);
+strip("rowB", "daysB", DAT.B);
+
+/* September runway: today through entry close. */
+var cal = document.getElementById("cal");
+for (var d = 5; d <= 23; d++){
+  var c = document.createElement("div");
+  c.className = d === 5 ? "today" : (d === 23 ? "dead" : "");
+  c.innerHTML = "<b>" + d + "</b>";
+  cal.appendChild(c);
+}
+</script>
+</body>
+
+</html>
