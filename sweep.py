@@ -75,25 +75,44 @@ AXES = {
 # 144 episodes -- every cell within noise of the incumbent -- so they only spent evaluations.
 
 
-def score(params, seeds, opps, workers):
-    """(mean bank, p10 bank) over the panel, or a large negative on any veto.
+def score(params, seeds, opps, workers, objective="mean"):
+    """Panel score for one cell, or a large negative on any veto.
 
     A raise inside `Policy.act` is caught by its own guard and recorded in `last_error`, so it
     shows up as a silently worse episode rather than a crash -- which is exactly why it has to
     be vetoed explicitly here instead of being left to the mean.
+
+    Two objectives, and against a peer they disagree:
+
+      `mean`  (mean bank, p10 bank). Right against the built-in opponents, where every episode is
+              won anyway and the only question is how much is banked.
+      `wins`  (win fraction, mean bank). Right against `self`, because a ladder rating is won per
+              episode rather than per dollar -- and in the peer regime a cell can bank far more
+              while losing far more matches. Capping the melon opening does exactly that: +$25k
+              of bank, -14pp of win rate. See `analysis/melon_matrix.py`.
     """
     rows = evaluate(seeds, opps, workers=workers, quiet=True, params=params)
     banks = sorted(r["bank"] for r in rows)
     if any(r["err"] for r in rows) or any(r["over_budget"] for r in rows):
         return -1e12, -1e12
     n = len(banks)
-    return sum(banks) / n, banks[max(0, int(0.1 * n) - 1)]
+    mean = sum(banks) / n
+    if objective == "wins":
+        wins = sum(1 for r in rows if r["bank"] > r.get("opp_bank", 0)) / n
+        return wins, mean
+    return mean, banks[max(0, int(0.1 * n) - 1)]
 
 
-def sweep(seeds, opps, axes, rounds, workers):
+def _fmt(s, objective):
+    if objective == "wins":
+        return "win %6.1f%%  mean $%8.0f" % (100 * s[0], s[1])
+    return "mean $%8.0f  p10 $%8.0f" % (s[0], s[1])
+
+
+def sweep(seeds, opps, axes, rounds, workers, objective="mean"):
     best = {k: PARAMS[k] for k in axes}
-    cur = score(best, seeds, opps, workers)
-    print("start %s -> mean $%.0f p10 $%.0f" % (best, cur[0], cur[1]))
+    cur = score(best, seeds, opps, workers, objective)
+    print("start %s -> %s" % (best, _fmt(cur, objective)))
     t0 = time.monotonic()
     evals = 1
     for rnd in range(rounds):
@@ -104,23 +123,22 @@ def sweep(seeds, opps, axes, rounds, workers):
                 if val == incumbent:
                     continue
                 cand = dict(best, **{axis: val})
-                s = score(cand, seeds, opps, workers)
+                s = score(cand, seeds, opps, workers, objective)
                 evals += 1
                 flag = ""
                 if s > cur:
                     best, cur, changed, flag = cand, s, True, "  <-- best"
-                print("  %-12s = %-6s  mean $%8.0f  p10 $%8.0f%s"
-                      % (axis, val, s[0], s[1], flag))
+                print("  %-12s = %-6s  %s%s" % (axis, val, _fmt(s, objective), flag))
             if best[axis] != incumbent:
                 print("  %-12s : %s -> %s" % (axis, incumbent, best[axis]))
-        print("round %d done: mean $%.0f p10 $%.0f  (%d evals, %.0fs)"
-              % (rnd, cur[0], cur[1], evals, time.monotonic() - t0))
+        print("round %d done: %s  (%d evals, %.0fs)"
+              % (rnd, _fmt(cur, objective), evals, time.monotonic() - t0))
         if not changed:
             break
     return best, cur
 
 
-def holdout(best, seeds, opps, workers):
+def holdout(best, seeds, opps, workers, objective="mean"):
     """Re-score the winning cell and the incumbent on seeds the descent never saw.
 
     Reported per axis as well as for the block, because the block is usually carried by one or
@@ -128,19 +146,21 @@ def holdout(best, seeds, opps, workers):
     ship it.
     """
     inc = {k: PARAMS[k] for k in best}
-    rows = [("incumbent", score(inc, seeds, opps, workers))]
+    rows = [("incumbent", score(inc, seeds, opps, workers, objective))]
     for axis in best:
         if best[axis] != inc[axis]:
             rows.append(("%s = %s" % (axis, best[axis]),
-                         score(dict(inc, **{axis: best[axis]}), seeds, opps, workers)))
-    rows.append(("all changes together", score(best, seeds, opps, workers)))
+                         score(dict(inc, **{axis: best[axis]}), seeds, opps, workers, objective)))
+    rows.append(("all changes together", score(best, seeds, opps, workers, objective)))
     base = rows[0][1]
+    a, b = ("win%", "mean") if objective == "wins" else ("mean", "p10")
     print("\nHOLDOUT on %d seeds x %s, %d episodes" % (len(seeds), ",".join(opps),
                                                        len(seeds) * len(opps)))
-    print("  %-28s %10s %10s   %9s %9s" % ("cell", "mean", "p10", "d_mean", "d_p10"))
+    print("  %-28s %10s %10s   %9s %9s" % ("cell", a, b, "d_" + a, "d_" + b))
     for tag, s in rows:
-        print("  %-28s $%9.0f $%9.0f   %+9.0f %+9.0f"
-              % (tag, s[0], s[1], s[0] - base[0], s[1] - base[1]))
+        k = 100.0 if objective == "wins" else 1.0
+        print("  %-28s %10.1f %10.0f   %+9.1f %+9.0f"
+              % (tag, k * s[0], s[1], k * (s[0] - base[0]), s[1] - base[1]))
     return rows
 
 
@@ -151,22 +171,25 @@ def main_cli():
     ap.add_argument("--axes", default=",".join(AXES))
     ap.add_argument("--rounds", type=int, default=2)
     ap.add_argument("--workers", type=int, default=0)
+    ap.add_argument("--objective", default="mean", choices=("mean", "wins"),
+                    help="'wins' for self-play: rank by episodes taken, tiebreak on bank")
     ap.add_argument("--holdout", type=int, default=24,
                     help="how many unseen seeds to re-score the winner on; 0 to skip")
     ap.add_argument("--out", default="analysis/sweep_best.json")
     a = ap.parse_args()
     axes = [x for x in a.axes.split(",") if x in AXES]
     opps = a.opps.split(",")
-    best, s = sweep(range(a.seeds), opps, axes, a.rounds, a.workers or None)
-    print("\nTUNING PANEL mean $%.0f p10 $%.0f\n%s" % (s[0], s[1], json.dumps(best, indent=2)))
+    best, s = sweep(range(a.seeds), opps, axes, a.rounds, a.workers or None, a.objective)
+    print("\nTUNING PANEL %s\n%s" % (_fmt(s, a.objective), json.dumps(best, indent=2)))
     hold = None
     if a.holdout:
-        hold = holdout(best, range(a.seeds, a.seeds + a.holdout), opps, a.workers or None)
+        hold = holdout(best, range(a.seeds, a.seeds + a.holdout), opps, a.workers or None,
+                       a.objective)
     path = os.path.join(_HERE, a.out)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as fh:
-        json.dump({"params": best, "mean": s[0], "p10": s[1],
-                   "seeds": a.seeds, "opps": a.opps,
+        json.dump({"params": best, "score_a": s[0], "score_b": s[1],
+                   "objective": a.objective, "seeds": a.seeds, "opps": a.opps,
                    "holdout": [[t, list(v)] for t, v in (hold or [])]}, fh, indent=2)
     print("wrote %s" % a.out)
 

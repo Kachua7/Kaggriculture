@@ -245,6 +245,14 @@ BUILTIN_AGENTS = {
     # still throws away its last strawberry cohort.
     "self_noanimal": make_self_agent({"n_animals": 0}),
     "self_nohaul": make_self_agent({"haul_trigger": 999.0, "endgame_days": 2}),
+    # The policy as it stood BEFORE the peer retune, i.e. the cell that was tuned entirely against
+    # the built-ins. Kept because `self` now means the retuned mirror -- `_BASELINE` is a snapshot
+    # of live PARAMS -- so without this the comparison that justified the retune becomes
+    # unmeasurable. Beating this opponent 144/144 is the claim; beating `self` ~50% is the honest
+    # mutual-adoption number, and both are worth being able to re-run.
+    "self_pretune": make_self_agent({"seed_alpha": 0.0, "seed_slots": 3, "seed_grace": 3,
+                                     "labour_slack": 1.0, "fert_stock": 24,
+                                     "haul_trigger": 2.00, "n_animals": 1}),
     # A peer that RESTRAINS its melon opening. Needed to fill in the other half of the 2x2 over
     # `mix_cap`, which is the only way to tell a Pareto improvement from a dominated strategy:
     # restraint raises both banks, so it looks like a $25k win until you check whether the flooder

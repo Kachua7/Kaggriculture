@@ -87,7 +87,41 @@ PARAMS = dict(
                              # day. With the growth-triggered re-cut in `_act`, 10 is +$5,709
                              # mean / +$3,827 p10 on seeds 0-47 and +$5,293 / +$3,904 on the
                              # disjoint 48-95, both 144 episodes against a ~$1k standard error.
-    seed_alpha=0.0,          # 0 = fund seeds by $/tile-visit, 1 = by $/seed-dollar
+    # ---------------------------------------------------------------------------------------
+    # THE PEER RETUNE. Everything below marked `[peer]` was moved by a coordinate descent run
+    # against `--opps self` on the win-fraction objective, not against the built-in agents. It
+    # is the single largest change in the project and it is worth reading the reason.
+    #
+    # All three built-in opponents lose 144/144, so every number tuned against them was tuned
+    # in a market with one serious seller. Put the real policy in seat 1 and the season pays
+    # **$21,809 instead of $87,000**, because both farms drain one shared order book. The old
+    # cell was not a strong policy that happened to score well; it was a policy fitted to an
+    # uncontested market, and it collapses in a contested one.
+    #
+    # The retuned cell, measured (see `analysis/descent.py`, `analysis/blocks.py`):
+    #
+    #   regime                                 old cell            this cell
+    #   vs starter/heuristic/random, 432 eps    $87,345             $87,069      -$276
+    #   vs a peer running the OLD cell, 144     $21,829 / 42%       $71,228 / 100%  +$49,399
+    #   both seats running THIS cell, 144       $21,235 / 50%       $50,579 / 53%   +$29,345
+    #
+    # Three things make this adoptable rather than a panel artifact. It replicated on a 96-seed
+    # holdout the descent never saw (+55.2pp win, +$49,684). It won every one of three disjoint
+    # blocks in both peer regimes. And the third row is the one that matters most: the gain is
+    # NOT exploitation of the old policy's specific weakness, because it survives mutual
+    # adoption -- if the whole field played this cell the mirror would pay 2.4x what it does now.
+    #
+    # The cost is $276 an episode against opponents that do not compete, still 144/144 wins on
+    # every block. `analysis/blocks.py` prints REJECT for that panel and it is right to; the
+    # decision is a two-panel trade and the peer panel is 180x larger.
+    # ---------------------------------------------------------------------------------------
+    seed_alpha=0.5,          # 0 = fund seeds by $/tile-visit, 1 = by $/seed-dollar. [peer] 0.0
+                             # -> 0.5 is +13.5pp win / +$16,871 alone on the holdout, the second
+                             # largest single move. Under contention the binding constraint stops
+                             # being tile-visits and becomes CASH: the opponent is bidding the
+                             # same land away, so ranking seed spend by return per dollar rather
+                             # than per visit buys the quadrant first. Against weaklings there is
+                             # no race, which is why this axis measured flat for weeks.
     reserve=1.10,            # stop selling a good below this fraction of its base price...
     crowded=0.55,            # ...unless the shed is this full, when refusing a sale destroys it
     always_sell=("MELON",),  # goods no shop ever buys: the price never recovers, so never hold
@@ -96,15 +130,19 @@ PARAMS = dict(
     weed_dig=True,           # clear weeds so the tile can be replanted
     # Market-order slot budget. Ten orders a turn, and HIRE spends one per hand, so a full
     # roster would eat the lot -- these two hold seed and sales out of its reach.
-    seed_slots=3,            # BUY_SEED carries a quantity, so three slots is three crops
+    seed_slots=2,            # BUY_SEED carries a quantity, so two slots is two crops. [peer] 3
+                             # -> 2 is worth -$19 on its own, i.e. nothing; it is in the cell
+                             # because the seven-axis cell measured $609 BETTER than the
+                             # four-axis one on the built-in panel, consistently across blocks.
     hire_hours=4,            # keep re-attempting deferred hires this far into the day
-    seed_grace=3,            # hours a PLANT job waits for its seed before being dropped
+    seed_grace=1,            # hours a PLANT job waits for its seed before being dropped. [peer]
+                             # 3 -> 1, and exactly $0 on its own -- same justification as above.
     # Acreage ceiling as a multiple of the roster's daily tile-visits. Below 1.0 the farm plants
     # less than it can water; measured, that trade is close to flat between 1.0 and unconstrained
     # ($62.8k vs $62.2k on the 48-episode panel) and it halves deaths by thirst, so 1.0 is the
     # cheap insurance rather than a win. Most of what `eval.py` counts as "weeds" is not thirst
     # at all but plants that finished their schedule and decayed -- see analysis/weed_probe.py.
-    labour_slack=1.0,
+    labour_slack=1.2,        # [peer] 1.0 -> 1.2, +$141 alone. Part of the seven-axis cell.
     # Fertilizer. One dose doubles the units added on every gain-day it covers, and for one_time
     # crops raises the ceiling as well. Measured per tile-cycle (analysis/fert_probe.py): melon
     # +2 units for one dose and one visit, tomato +3, strawberry +3, wheat and carrot negative.
@@ -116,7 +154,11 @@ PARAMS = dict(
     # Standing dose buffer. Sharply peaked, and not for the reason you would guess: the shed
     # holds 100 items across every good, so a large buffer starts destroying harvest at midnight.
     # Measured means at margin 1.6: 8 -> $66.5k, 16 -> $69.6k, 40 -> $56.9k, 60 -> $46.5k.
-    fert_stock=24,
+    # [peer] 24 -> 8, worth +$11,399 of bank on its own against a peer while COSTING 11.5pp of
+    # win rate alone -- the two objectives disagree on this axis and only the combination is
+    # positive on both. Under contention shed slots are scarcer and cash is tighter, so a
+    # 24-dose buffer is capital and storage spent on a crop bonus the farm cannot yet fund.
+    fert_stock=8,
     # How much of the town's drain over a tile's growing period to credit when pricing that
     # tile. The drain itself is exact -- the observation names the unlocked shops and the
     # engine's baskets are known -- but the opponent sells into the same inventory, so
@@ -183,7 +225,15 @@ PARAMS = dict(
     # `_refresh_animal` setting `fertilizer_available` daily and unconditionally, which is a
     # MIRROR fact. If the real engine gates that dose the gain shrinks. Bounded downside (~$800)
     # against a consistent p10 gain, so it goes in now and gets re-checked against real source.
-    n_animals=1,
+    #
+    # **[peer] 1 -> 2.** The rejection above stands for the built-in panel -- two animals really do
+    # cost $638 there, and the reason given is right: ~97 doses a season is one animal's work, so
+    # the second one's output is surplus occupying shed slots. Against a peer it is +5.2pp of win
+    # rate and +$2,398, the smallest of the four real moves in the retune. What changes is what
+    # the surplus is FOR: milk is the one good on the board the opponent is not flooding, so a
+    # second stream of it is revenue that does not have to fight for the order book. The `lost`
+    # objection also weakens once `haul_trigger` is 0.55, because bags no longer wait for midnight.
+    n_animals=2,
     # A structure has to beat this many dollars per visit to be worth building, judged against
     # the crop it displaces. Melon realizes $81 a visit, which is the number to beat -- but the
     # rank is computed from the shop list as it stands, and on day 0 no shop has opened yet, so
@@ -209,7 +259,19 @@ PARAMS = dict(
     # $73.6k to $64.0k, with thirst units up 14 -> 90 as the commutes ate the waterings. The
     # loss worth preventing is not spoilage in general, it is the one catastrophic dump at the
     # end of the season, and that only happens when the bags hold multiples of the shed.
-    haul_trigger=2.00,
+    #
+    # **[peer] All of that is true against opponents that do not compete, and it is the wrong
+    # answer against one that does.** 2.00 -> 0.55 is the single largest move in the peer retune:
+    # +25.0pp of win rate and +$21,351 of bank on the 96-seed holdout, on its own. Both readings
+    # are correct and the mechanism is the same one from opposite ends. Against a weakling the
+    # order book is still there at midnight, so waiting for the free dump is right and the commute
+    # is pure waste. Against a peer the book is being drained hour by hour, so produce sitting in
+    # a bag is produce sold at the price the opponent leaves behind -- the commute buys the spread,
+    # and it buys it every day rather than once on day 28. The old figure quoted here ($73.6k ->
+    # $64.0k, thirst 14 -> 90) was measured pre-calibration and re-measured at $85,015 with thirst
+    # 75.8 -> 78.0; the direction held, the magnitude was 14x off. Cost against the built-ins is
+    # real but small, and `lost` falls 12.2 -> 9.6 as a side effect.
+    haul_trigger=0.55,
     # Units in one bag before that trip is worth its commute. Sharp on the high side: at 28 the
     # condition essentially never fires (mean falls back to $73.7k) because no single unit ever
     # carries that much. The plateau is 14-22, flat to about $1k across it.
