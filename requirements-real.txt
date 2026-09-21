@@ -1,0 +1,6 @@
+# The real Kaggle engine, pinned by content: calibration/engine/MANIFEST.sha256 must
+# match the wheel's files. The env requires Python >=3.11 — bootstrap.sh picks python3.13
+# when present. 1.32.2 is kept alongside only to re-simulate the tutorial replay
+# (calibration/real_engine/tutorial_episode.json was recorded on it).
+kaggle-environments==1.32.7
+kaggle

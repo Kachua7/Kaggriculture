@@ -1,0 +1,39 @@
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+
+# calibration output: the real engine's source is Kaggle's, not ours to vendor.
+# Re-vendor it locally with `bash bootstrap.sh` (pinned by MANIFEST.sha256 logic in
+# requirements-real.txt); the vendored dirs must never be committed.
+calibration/engine/
+calibration/engine-1.32.2/
+calibration/real_engine/
+calibration/truth.json
+calibration/versions.txt
+
+# eval + sweep output
+artifacts/
+*.json.gz
+
+# competition replay data (Kaggle's, multi-GB): re-fetchable from the official
+# kaggriculture-episodes-* datasets via `python3 analysis/restore_replays.py --scan --download`
+majkel1337games/
+sub10games/
+analysis/replays/
+analysis/episodes_index/
+analysis/replay_location_map.json
+replay*.json
+
+# submission packages are generated (bundle.py / pack.sh); commit the source, not the zip
+submission/
+*.tar.gz
+*.zip
+
+# day-0 opening book is captured locally from recorded episodes (capture_book.py)
+kagfarm/opening_book.json
+
+# secrets
+kaggle.json
+.env
