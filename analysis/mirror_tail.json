@@ -1,0 +1,172 @@
+{
+ "cfg": {
+  "seeds": 3,
+  "start": 0,
+  "dump": 0,
+  "json": "/Users/pranjalmorwal/Desktop/kaggriculture 2/analysis/mirror_tail.json"
+ },
+ "rows": [
+  {
+   "seed": 2,
+   "mine": 4078.0,
+   "theirs": 4091.0,
+   "total": 8169.0,
+   "land0": 4,
+   "land1": 4,
+   "land_day0": {
+    "NE": 11,
+    "SW": 11,
+    "SE": 11
+   },
+   "land_day1": {
+    "NE": 11,
+    "SW": 11,
+    "SE": 11
+   },
+   "hands0": 5,
+   "hands1": 5,
+   "px0": {
+    "MELON": 0.612,
+    "STRAWBERRY": 0.0,
+    "WHEAT": 1.327,
+    "MILK": 0.0
+   },
+   "px1": {
+    "MELON": 0.612,
+    "STRAWBERRY": 0.0,
+    "WHEAT": 1.327,
+    "MILK": 0.0
+   },
+   "u0": {
+    "MELON": 96,
+    "STRAWBERRY": 0,
+    "WHEAT": 22,
+    "MILK": 0
+   },
+   "u1": {
+    "MELON": 96,
+    "STRAWBERRY": 0,
+    "WHEAT": 22,
+    "MILK": 0
+   },
+   "shops": [
+    "YARN_STORE",
+    "BRUNCH_SPOT",
+    "BRUNCH_SPOT",
+    "ICE_CREAM_SHOP",
+    "BRUNCH_SPOT",
+    "FARMERS_MARKET",
+    "YARN_STORE",
+    "ICE_CREAM_SHOP"
+   ]
+  },
+  {
+   "seed": 1,
+   "mine": 54417.0,
+   "theirs": 54434.0,
+   "total": 108851.0,
+   "land0": 4,
+   "land1": 4,
+   "land_day0": {
+    "NE": 11,
+    "SW": 11,
+    "SE": 11
+   },
+   "land_day1": {
+    "NE": 11,
+    "SW": 11,
+    "SE": 11
+   },
+   "hands0": 10,
+   "hands1": 10,
+   "px0": {
+    "MELON": 0.612,
+    "STRAWBERRY": 1.955,
+    "WHEAT": 1.519,
+    "MILK": 2.074
+   },
+   "px1": {
+    "MELON": 0.612,
+    "STRAWBERRY": 1.957,
+    "WHEAT": 1.519,
+    "MILK": 2.074
+   },
+   "u0": {
+    "MELON": 96,
+    "STRAWBERRY": 100,
+    "WHEAT": 421,
+    "MILK": 41
+   },
+   "u1": {
+    "MELON": 96,
+    "STRAWBERRY": 100,
+    "WHEAT": 421,
+    "MILK": 41
+   },
+   "shops": [
+    "PIZZA_SHOP",
+    "YARN_STORE",
+    "ICE_CREAM_SHOP",
+    "PIZZA_SHOP",
+    "SMOOTHIE_SHOP",
+    "ICE_CREAM_SHOP",
+    "PET_CAFE",
+    "PET_CAFE"
+   ]
+  },
+  {
+   "seed": 0,
+   "mine": 59749.0,
+   "theirs": 50422.0,
+   "total": 110171.0,
+   "land0": 4,
+   "land1": 4,
+   "land_day0": {
+    "NE": 11,
+    "SW": 11,
+    "SE": 11
+   },
+   "land_day1": {
+    "NE": 11,
+    "SW": 11,
+    "SE": 11
+   },
+   "hands0": 4,
+   "hands1": 5,
+   "px0": {
+    "MELON": 0.612,
+    "STRAWBERRY": 2.11,
+    "WHEAT": 1.604,
+    "MILK": 1.284
+   },
+   "px1": {
+    "MELON": 0.612,
+    "STRAWBERRY": 2.087,
+    "WHEAT": 1.598,
+    "MILK": 1.266
+   },
+   "u0": {
+    "MELON": 96,
+    "STRAWBERRY": 92,
+    "WHEAT": 484,
+    "MILK": 74
+   },
+   "u1": {
+    "MELON": 96,
+    "STRAWBERRY": 62,
+    "WHEAT": 557,
+    "MILK": 81
+   },
+   "shops": [
+    "FARMERS_MARKET",
+    "PET_CAFE",
+    "BAKERY",
+    "PIZZA_SHOP",
+    "FARMERS_MARKET",
+    "FARMERS_MARKET",
+    "BAKERY",
+    "YARN_STORE"
+   ]
+  }
+ ]
+}

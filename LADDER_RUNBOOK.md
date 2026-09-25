@@ -5,6 +5,12 @@ replication). This file exists because the ONLY remaining calibration question �
 which engine version the ladder actually runs — is answered by a replay, and the
 replay only exists after a submission. Do the steps in order; do not skip 4.
 
+**Final window (25–30 Sep 2026):** which builds ride the two tracked submission slots,
+the daily collect/autopsy/judge loop, and the freeze rule are governed by
+`LADDER_AB_PROTOCOL.md` (ledger 0925j). This file keeps the mechanics: upload commands,
+replay retrieval, fingerprint decision rule (step 4 — now run on EVERY tape daily, not
+just the first).
+
 ## The exec-context rule (learned 2026-09-17, non-negotiable)
 
 The harness does NOT import `main.py` as a module. `kaggle_environments.agent
@@ -26,9 +32,9 @@ smoke, P0.1 of PRE_SUBMIT_CHECKLIST).
 python3 -m unittest discover -s tests -q        # 36 tests, OK
 bash pack.sh                                    # PACK OK, bank-for-bank vs repo
 python3 bundle.py                               # BUNDLE OK (single-file fallback)
-<repo root>/.venv/bin/python calibration/a3_compare.py
+/Users/pranjalmorwal/Desktop/kaggriculture/.venv/bin/python calibration/a3_compare.py
 # The only gate that replays the submission path the ladder actually uses:
-<repo root>/.venv/bin/python analysis/harness_smoke.py
+/Users/pranjalmorwal/Desktop/kaggriculture/.venv/bin/python analysis/harness_smoke.py
 ```
 
 `harness_smoke.py` is non-optional since 2026-09-17: it runs the exact tar bytes through
@@ -74,7 +80,7 @@ Save it as `calibration/replays/first.json` (create the directory if needed).
 ## 4. Fingerprint the replay (the reason for steps 1–3)
 
 ```
-<repo root>/.venv/bin/python \
+/Users/pranjalmorwal/Desktop/kaggriculture/.venv/bin/python \
     calibration/fingerprint.py calibration/replays/first.json
 ```
 

@@ -63,6 +63,28 @@ SPECTATOR_IDS = {
     # 1430410553: the only elite tape that survived the Downloads cleanup — now the
     # PRIMARY elite judge (Majkel's third registered game).
     "111369668": {"sparo": 0, "majkel3": 1},
+    # 112127332 = Pranjal Morwal $65,585 (seat 0) vs Luan He $97,554 (seat 1), seed
+    # 1907357912. Luan He's plant cadence is the winner-profile the s12 autopsies
+    # named: 1-3 seeds/day d5-d10 (staggered cohorts) vs our two tsunamis.
+    "112127332": {"luanhe": 1},
+    # 112129810 = juicyorange $88,022 (seat 0) vs Pranjal Morwal $40,425 (seat 1),
+    # seed 211331135: the $47.6k loss. Second field judge on the fresh build.
+    "112129810": {"juicy": 0},
+    # -- the MIDFIELD tier (2026-09-25, ELO package): the 2400-2900 coin-flip band where
+    # Bradley-Terry rating actually moves (elite losses are nearly free; these decide the
+    # record). Seat maps from TeamNames order, verified against the reward banks.
+    # 113122185 = Pranjal $90,413 (seat 0) vs Tâm La Thành $67,342 (seat 1), seed
+    # 969596258: the endgame-conversion WIN specimen (d26 gap -$11k -> +$23.1k).
+    "113122185": {"midfield_tam": 1},
+    # 112957999 = Dean Johnson $41,669 (seat 0) vs Pranjal $51,162 (seat 1), seed
+    # 970394715: the +$9.5k win (980u strawberry @ $200 realized).
+    "112957999": {"midfield_dean": 0},
+    # 112959216 = Pranjal $47,641 (seat 0) vs Jiahan Cao $57,066 (seat 1), seed
+    # 309707973: the -$9.4k near-miss (892u @ $269 -- premium prices, volume short).
+    "112959216": {"midfield_jiahan": 1},
+    # 112952973 = Pranjal $66,148 (seat 0) vs susutem $76,805 (seat 1), seed
+    # 1465775700: the -$10.7k near-miss (1279u @ $215 -- ~50 units short).
+    "112952973": {"midfield_susutem": 1},
     # -- the RESTORED dossier (2026-09-21, analysis/restore_replays.py): the 12 wiped
     # Majkel games re-pulled from kaggle/kaggriculture-episodes-2026-09-1{9,20} into
     # analysis/replays/. Majkel wins all 13 restored games; margins +$326 to +$21.6k.

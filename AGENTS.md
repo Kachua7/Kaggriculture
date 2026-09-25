@@ -5,7 +5,7 @@ Session learnings that cannot be recovered by reading the code.
 ## Workspace
 
 - The tool's default workspace root is an UNRELATED project (Virasat/BitKosh). Every
-  Kaggriculture command must `cd "<repo root>"` first —
+  Kaggriculture command must `cd "/Users/pranjalmorwal/Desktop/kaggriculture 2"` first —
   the checkout was renamed 2026-09-20 and the path has a SPACE, so always quote it
   (a typo'd root like "kaggressive 2" fails silently when the command ends in `2>/dev/null`);
   read/list tools accept that absolute path directly.

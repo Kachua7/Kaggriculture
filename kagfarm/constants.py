@@ -37,6 +37,54 @@ BOARD_SIZE = 10
 STARTING_MONEY = 3000.0
 MAX_MARKET_ORDERS = 10
 SHED_CAPACITY = 100
+
+# -- majkel_skeleton preset (grind 2026-09-21, 13-tape census in calibration/live.md).
+# The STRUCTURE every Majkel game shares, as pure PARAMS overrides -- no code paths. It
+# exists to separate skeleton from intelligence: if the mirror reproduces his shape
+# (roster 12/day from t2, herd 14 by d8, land by d6, melon0 ~8, constant selling) the
+# remaining gap is the allocation function, not the executor. Apply with
+# `PARAMS.update(majkel_skeleton())`. The census numbers behind each line:
+#   t1 animal + t2 first hire (13/13) -> led_cow0 fires the d0 script; roster floor 11
+#     (his 288-295 hires/season = 12/day with zero gaps -- the floor prices INTENT, the
+#     fib cash gate still caps spend; led_roster_floor=0 measured -$25k against a POOR
+#     seed round, but melon0=8 + wheat-heavy mix changes that calculus -- re-measure).
+#   melon0 6-14 (median 12, mode 6)    -> melon_opening=8: inside his band, and the s10
+#     22-seed synchronized wave is the ladder-punished profile
+#   herd 10-18 by d10, median 14       -> led_herd_target 14 (was 12), animal_pace 3
+#   first BUY_LAND t78-150 (d4-6)      -> our land gate is cash+tile-limited, d9-14 --
+#     land_early raises the windfall cap's reserved fraction instead of bypassing gates
+#   mix: wheat 125-235, carrot 19-139, strawberry 17-56 -> wheat-heavy mix (his d0
+#     residual is ~$300 of seed after the script; wheat funds the field immediately)
+MAJKEL_SKELETON = dict(
+    opening_led=True, elite_script=True, melon_opening=8,
+    led_cow0=1, led_cow2=1, led_sheep0=3, led_wheat0=4,
+    led_herd_target=14, herd_cow=9, herd_sheep=5, herd_goose=0,
+    led_roster_ramp=1, led_roster_floor=0, max_hands=11, animal_pace=3, shepherd_share=4,
+    seed_opening_cap=250, opening_float=900, seed_floor=400, feed_bridge=4, feed_backbone=True,
+    land_early=True, expansion_cash=5,
+    mix={"WHEAT": 16, "CARROT": 6, "MELON": 12, "STRAWBERRY": 12},
+    # P2c (grind 0922, TESTED AND OFF — third floor variant, third failure): the
+    # k-scaled field-cadence floor (bridge priced from the real wheat schedule, largest
+    # k the bank carries) collapsed the mirror — seed 0 herd 2C+2S, seed 2 herd ZERO,
+    # banks $28.9-57.3k vs $62-66k. The bridge is PRICED into the floor but not ENFORCED
+    # (the grain reservation is advisory; wages/seeds/fert still draw the remainder), so
+    # early k-buys starve the bridge exactly like the 0921 raw-cost and P2 fixed forms.
+    # Three independent designs now agree: the legacy wall's slack IS the field
+    # protection — buys from food-security only. Mechanism kept for the P5 tuner; do not
+    # enable without an enforced reservation (e.g. the emission itself buying the bridge
+    # grain in the same order batch).
+    feed_floor=False, feed_days=2, feed_days_max=6, poverty_reserve=150,
+    # P3 milk first-mover window (the 907 leak: we realized $49/unit into the two-herd
+    # glut, he realized $139). Hold shed milk once the rival's PUBLIC cow herd is
+    # glut-scale AND the live price has rolled off the season peak; sell into strength.
+    milk_window=True, milk_window_start=13, milk_opp_glut=8,
+    milk_hold_frac=0.8, milk_hold_cap=40,
+)
+
+
+def majkel_skeleton():
+    """Fresh copy of the preset (PARAMS.update would otherwise share nested dicts)."""
+    return {k: (dict(v) if isinstance(v, dict) else v) for k, v in MAJKEL_SKELETON.items()}
 WEED_SPAWN_CHANCE = 0.005
 ACT_TIMEOUT_S = 1.0                                    # a single slow turn forfeits
 
@@ -628,6 +676,29 @@ def yield_cap(crop: str, fertilized: bool) -> int:
     # max_yield regardless. The old per-crop unfert values were a mirror-only invention —
     # kept as dead data in OBJECT_TABLE for provenance, never used here.
     return spec.get("max_yield", 1)
+
+
+def decay_clock_running(crop: str, age_days: int) -> bool:
+    """True once the plant is past max lifespan and its standing yield is bleeding.
+
+    Engine rule (official spec + traced constants): past max lifespan the standing
+    yield drops 1 unit every 2 TURNS -- a 6-unit melon rots inside half a day, a
+    full wheat tile inside a quarter of one. `harvest_plan` still emits the job and
+    prices it by standing units, but at tier HARVEST it loses the value lottery on
+    over-subscribed days and the tile is weeds by midnight with the units unsold
+    (analysis/weed_probe.py: most "weeds" are decayed FINISHED plants -- produce
+    that was paid for, grown, and never sold). One-time crops start bleeding at
+    `lifespan_days`; ongoing crops one day after their last scheduled yield.
+    Read off `planted_day` age -- no observation key needed (missing keys cost
+    accuracy, never a raise, per the constants.py contract).
+    """
+    spec = OBJECT_TABLE.get(crop)
+    if not spec:
+        return False
+    if spec.get("kind") == "one_time":
+        return age_days >= spec.get("lifespan_days", 10 ** 9)
+    sched = spec.get("sched_days") or ()
+    return bool(sched) and age_days > sched[-1]
 
 
 def needs_water(crop: str, age_days: int) -> bool:

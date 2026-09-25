@@ -19,10 +19,11 @@ if _HERE not in sys.path:
 
 from engine import KaggricultureEnv  # noqa: E402
 from kagfarm.constants import (BOARD_SIZE, OBJECT_TABLE, SEASON_DAYS,   # noqa: E402
-                               TURNS_PER_DAY)
+                               TURNS_PER_DAY, I0)
 from kagfarm.policy import (Policy, PARAMS, PARAMS_BASE,           # noqa: E402
                             read_config_version, probe_melon_interval,
-                            set_engine_profile, engine_verdict)
+                            set_engine_profile, engine_verdict,
+                            _marginal_hold, opp_acreage_supply)
 
 import main  # noqa: E402
 
@@ -345,10 +346,36 @@ class TestSellOrders(unittest.TestCase):
 
     def test_inputs_never_sold_before_endgame(self):
         # FERTILIZER sold back the turn after it was bought empties the buffer the
-        # fertilize jobs route against.
+        # fertilize jobs route against. sell_fert=0 (legacy) never names it mid-season;
+        # sell_fert=1 (0924e) sells the ANIMAL BYPRODUCT stream -- sized off the shed
+        # pool only, which never contains the buffer's committed doses because those
+        # live in the same shed... so the guard here is the floor: mid-season sales
+        # clear the crater zone, never the crop-margin zone.
         pol = Policy()
+        pol.p = dict(pol.p, sell_fert=0)
         orders = pol._sell_orders({"FERTILIZER": 8}, {}, {"FERTILIZER": 150}, [], day=0)
         self.assertFalse(any(o[1] == "FERTILIZER" for o in orders))
+        pol.p = dict(pol.p, sell_fert=1)
+        pol.opp_census = {"COW": 9, "SHEEP": 0, "GOOSE": 0}  # real rival (drip gate)
+        # THREE-REGIME contract (0924g): comfortable shed + CRATER price -- fert is not
+        # named (the slot is worth more held for produce). Comfortable + GOOD price
+        # (>= fert_drip_px x base) + a real rival herd (>= opp_fert_demand) -- fert
+        # drips (the winners' continuous fert lane: $69-81k seasons, our valve held
+        # ~$3k to d24). Crowded shed -- fert is named FIRST as overflow relief
+        # (cheapest unit protects the $110 berry).
+        orders = pol._sell_orders({"FERTILIZER": 40}, {}, {"FERTILIZER": 25}, [], day=12)
+        self.assertFalse(any(o[1] == "FERTILIZER" for o in orders))
+        orders = pol._sell_orders({"FERTILIZER": 40}, {}, {"FERTILIZER": 95}, [], day=12)
+        fert = [o for o in orders if o[0] == "SELL" and o[1] == "FERTILIZER"]
+        self.assertTrue(fert and fert[0][2] > 0, "drip should fire at 0.95x base")
+        pol.opp_census = {"COW": 0, "SHEEP": 0, "GOOSE": 0}  # passive twin: no buyer
+        orders = pol._sell_orders({"FERTILIZER": 40}, {}, {"FERTILIZER": 95}, [], day=12)
+        self.assertFalse(any(o[1] == "FERTILIZER" for o in orders),
+                         "drip must NOT fire against a herdless rival")
+        pol.opp_census = {"COW": 9, "SHEEP": 0, "GOOSE": 0}
+        orders = pol._sell_orders({"FERTILIZER": 70}, {}, {"FERTILIZER": 25}, [], day=12)
+        fert = [o for o in orders if o[0] == "SELL" and o[1] == "FERTILIZER"]
+        self.assertTrue(fert and fert[0][2] > 0)
 
     def test_endgame_liquidates_everything(self):
         pol = Policy()
@@ -365,6 +392,62 @@ class TestSellOrders(unittest.TestCase):
         orders = pol._sell_orders({"STRAWBERRY": 51}, {}, {"STRAWBERRY": 200}, [], day=28)
         sell = [o for o in orders if o[0] == "SELL" and o[1] == "STRAWBERRY"]
         self.assertEqual(sell and sell[0][2] or 0, 2)
+
+
+class TestWheatDrip(unittest.TestCase):
+    """0925n wheat_drip: the winners sell 14-71 wheat units daily (curve autopsies);
+    ours parks feed_hold(12) x mouths in the shed and never flows d13-24. The knob
+    shrinks the mid-season bridge so surplus drips through the normal reserve floor.
+    0 = byte-identical."""
+
+    def _shed_animals(self):
+        # one live cow, one placed: mouths = 2
+        return {"live": 2, "held": 0, "n_buy": 0, "n_build": 0}
+
+    def test_off_form_is_byte_identical_to_shipped(self):
+        # wheat_drip=0: hold = feed_hold(12) x 2 mouths = 24; shed 40 -> sellable 16.
+        # minv 9900 = a scarcity-side book (~$35/unit, above the $27.5 floor).
+        pol = Policy({"wheat_drip": 0})
+        pol.animals = self._shed_animals()
+        orders = pol._sell_orders({"WHEAT": 40}, {"WHEAT": 9900}, {"WHEAT": 35}, [], day=13)
+        sell = [o for o in orders if o[0] == "SELL" and o[1] == "WHEAT"]
+        self.assertEqual(sell and sell[0][2] or 0, 16)
+
+    def test_drip_shrinks_the_bridge_and_frees_surplus(self):
+        # wheat_drip=2: hold = 2 x 2 = 4; shed 40 -> sellable 36 (the daily cadence).
+        pol = Policy({"wheat_drip": 2})
+        pol.animals = self._shed_animals()
+        orders = pol._sell_orders({"WHEAT": 40}, {"WHEAT": 9900}, {"WHEAT": 35}, [], day=13)
+        sell = [o for o in orders if o[0] == "SELL" and o[1] == "WHEAT"]
+        self.assertEqual(sell and sell[0][2] or 0, 36)
+
+    def test_drip_never_crosses_the_reserve_floor(self):
+        # A glutted book (inv 10400 -> ~$20 < the $27.5 floor): the drip frees surplus,
+        # but the floor loop sells NOTHING rather than crater (the $2.9 dump-and-rebuy
+        # disaster stays impossible).
+        pol = Policy({"wheat_drip": 2})
+        pol.animals = self._shed_animals()
+        orders = pol._sell_orders({"WHEAT": 40}, {"WHEAT": 10400}, {"WHEAT": 20}, [], day=13)
+        self.assertFalse(any(o[0] == "SELL" and o[1] == "WHEAT" for o in orders))
+
+    def test_drip_respects_the_shepherd_one_day_floor(self):
+        # The third hold site (one day per mouth, shepherd stream) is a MAX with the
+        # bridge -- a 1-day drip can never undercut a live herd's same-day feed.
+        pol = Policy({"wheat_drip": 1})
+        pol.animals = {"live": 30, "held": 0, "n_buy": 0, "n_build": 0}
+        # shepherd_mode default 1; hold floor = 30 (1/mouth), bridge = 1 x 30 = 30.
+        # shed 35 -> sellable 5.
+        orders = pol._sell_orders({"WHEAT": 35}, {"WHEAT": 9900}, {"WHEAT": 35}, [], day=13)
+        sell = [o for o in orders if o[0] == "SELL" and o[1] == "WHEAT"]
+        self.assertEqual(sell and sell[0][2] or 0, 5)
+
+    def test_no_animals_no_hold_drip_inert(self):
+        # mouths 0: the hold never exists, drip or not -- all wheat is sellable stock.
+        pol = Policy({"wheat_drip": 2})
+        pol.animals = {"live": 0, "held": 0, "n_buy": 0, "n_build": 0}
+        orders = pol._sell_orders({"WHEAT": 10}, {"WHEAT": 9900}, {"WHEAT": 35}, [], day=13)
+        sell = [o for o in orders if o[0] == "SELL" and o[1] == "WHEAT"]
+        self.assertEqual(sell and sell[0][2] or 0, 10)
 
 
 class TestSellMeter(unittest.TestCase):
@@ -1152,9 +1235,29 @@ class TestPlannerMelonCap(unittest.TestCase):
 
     def test_default_allocator_unclamped(self):
         # The shipped contract: melon_opening=0 = allocator unclamped, day-0 mix_cap
-        # acreage restored (the funded-spray behavior the A/B prefers).
-        pol = Policy({"dawn_pace": None})
+        # acreage restored (the funded-spray behavior the A/B prefers). seed_opening_cap
+        # is zeroed here: that separate axis (0924j) caps the day-0 BUDGET, and at its
+        # shipped 650 it does bind day-0 melon count -- pinned in its own test below.
+        pol = Policy({"dawn_pace": None, "seed_opening_cap": 0})
         want, _ = pol._targets(_blank_tiles(), {"NW"}, 0, {}, 10**9, {}, {}, {})
+        self.assertGreater(want.get("MELON", 0), 8)
+
+    def test_seed_opening_cap_binds_day0(self):
+        # 0924j verdict: default REVERTED to 0 (judge bar -- capping the d0 melon wave
+        # starves the strawberry spray it funds; sc=650 and sc=1200 both lost $20k+).
+        # The mechanism stays armed-able for the skeleton window: when set, day-0 melon
+        # respects the budget (melon at $80/seed: at most 8 tiles fit $650).
+        pol = Policy({"dawn_pace": None})
+        self.assertEqual(pol.p["seed_opening_cap"], 0)
+        capped = Policy({"dawn_pace": None, "seed_opening_cap": 650})
+        want, _ = capped._targets(_blank_tiles(), {"NW"}, 0, {}, 10**9, {}, {}, {})
+        self.assertLessEqual(want.get("MELON", 0), 8)
+
+    def test_seed_opening_cap_is_day0_only(self):
+        # From d1 the standard net-of-wages budget returns (the census floats ~$800 and
+        # accumulates the mix on wool cash; the cap is an opening-window mechanism).
+        pol = Policy({"dawn_pace": None})
+        want, _ = pol._targets(_blank_tiles(), {"NW"}, 1, {}, 10**9, {}, {}, {})
         self.assertGreater(want.get("MELON", 0), 8)
 
     def test_clamp_binds_on_day0_when_enabled(self):
@@ -1229,8 +1332,13 @@ class TestShepherd(unittest.TestCase):
         # submission8 default: stream ON (measured +$2.8k mean / x3.6 floor); 0 remains
         # the off-switch back to the pre-shepherd behaviour.
         self.assertEqual(PARAMS_BASE["shepherd_mode"], 1)
-        # Overloaded stream: budget beyond the shepherd share freezes herd growth.
-        pol = Policy({"shepherd_mode": 1, "n_animals": 20, "shepherd_share": 1})
+        # Overloaded stream: when even a roster-roofed shepherd share cannot serve the
+        # projected herd, growth freezes. A 3-hand roster caps the share at 2 -- a
+        # 9-pasture farm cannot be served, so n_buy must stay 0. (grind 0921: the gate
+        # now grows the share up to the roster roof before freezing, so the roof --
+        # not a constant -- is what makes this scenario infeasible.)
+        pol = Policy({"shepherd_mode": 1, "n_animals": 20, "shepherd_share": 1,
+                      "max_hands": 3})
         tiles = [[None] * BOARD_SIZE for _ in range(BOARD_SIZE)]
         for i in range(9):
             (x, y), t = _pasture(1 + i % 4, 1 + i // 4)
@@ -1263,3 +1371,509 @@ class TestShepherd(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestWheelPlan(unittest.TestCase):
+    """The 0924i rebuilt service scheduler: per-animal shed-anchored trips.
+
+    Pins the structural contracts that make it safer than the chain at scale:
+    max per-loop cost bounded, produce delivered same-day, zero chain coupling.
+    """
+
+    def _tile(self, sp="COW", units=0, bank=2):
+        from kagfarm.constants import ANIMAL_STRUCTURE
+        return {"kind": ANIMAL_STRUCTURE.get(sp, "PASTURE"), "animal": sp,
+                "placed_day": 0, "yield_units": units, "fed_today": False,
+                "cared_today": False, "fertilizer_available": True,
+                "pending_care_bonus": bank, "consecutive_unfed": 0}
+
+    def test_trips_are_shed_anchored_and_independent(self):
+        from kagfarm.policy import wheel_plan
+        from kagfarm.constants import SHED_TILES, TURNS_PER_DAY
+        tiles = [((5, 3), self._tile()), ((3, 6), self._tile()),
+                 ((6, 6), self._tile("SHEEP", units=4, bank=3))]
+        loops, budget, costs = wheel_plan(tiles, 10, ("NW", "NE"), n_units=2)
+        self.assertEqual(len(loops), 2)                     # index parity for gate max()
+        self.assertEqual(len([c for c in costs if c > 0]), 2)
+        for loop in loops:
+            if not loop:
+                continue
+            self.assertEqual(loop[0]["op"][0], "PICKUP")    # every trip starts at the shed
+            self.assertIn(loop[0]["pos"], SHED_TILES.values())
+        # The max per-loop cost must fit inside a shepherd's DAY -- the chain's
+        # 99-turn cluster is exactly what this shape forbids. (A ring-2 trip with
+        # full chores runs ~9 turns; two trips ~20 -- both inside 24.)
+        self.assertLess(max(costs), TURNS_PER_DAY)
+        self.assertGreater(budget, 0)
+
+    def test_carrying_trips_end_at_shed_and_clean_trips_do_not(self):
+        from kagfarm.policy import wheel_plan
+        from kagfarm.constants import SHED_TILES
+        tiles = [((5, 3), self._tile(units=3)),      # HARVEST day -> must end with DROP
+                 ((3, 6), self._tile(units=0))]      # feed-only day -> no DROP leg
+        loops, _b, _c = wheel_plan(tiles, 10, ("NW", "NE"), n_units=1)
+        loop = loops[0]
+        self.assertEqual(loop[-1]["op"][0], "DROP")
+        # The DROP lands at the shed tile NEAREST THE ANIMAL: (5,3) is 1 from the
+        # NE access tile (5,4), 2 from NW (4,4).
+        self.assertEqual(loop[-1]["pos"], SHED_TILES["NE"])
+        # The clean trip's last leg is the FEED at the animal, not a shed DROP.
+        feed_legs = [j for j in loop if j["op"][0] == "FEED"]
+        self.assertEqual(len(feed_legs), 2)             # one FEED per trip
+        self.assertNotEqual(feed_legs[0]["pos"], SHED_TILES["NW"])
+
+    def test_wheel_never_costs_a_full_day_more_than_chain(self):
+        """The safety property the chain could not give: at ring distances the wheel's
+        per-loop bound must beat the chain's cluster bound, and the total budget must
+        stay within the bulk-PICKUP amortization the chain saves."""
+        from kagfarm.policy import wheel_plan, shepherd_loops
+        tiles = [((x, y), self._tile(units=2, bank=3))
+                 for x, y in ((5, 3), (3, 6), (6, 6), (7, 5))]
+        # Two shepherds: the chain still chains 2 animals per cluster (its per-loop
+        # cost grows with cluster size); the wheel's per-loop cost is per-TRIP and
+        # independent of herd size. That divergence is the whole point.
+        _l1, b_chain, c_chain = shepherd_loops(tiles, 10, ("NW", "NE"),
+                                               n_units=2, bag_cap=24)
+        _l2, b_wheel, c_wheel = wheel_plan(tiles, 10, ("NW", "NE"), n_units=2)
+        self.assertLess(max(c_wheel), max(c_chain))
+        # Bulk-PICKUP amortization is the chain's only edge; at ring distances it
+        # buys less than two extra walk legs per trip.
+        self.assertLess(b_wheel, b_chain + 15)
+
+
+class TestDecayUrge(unittest.TestCase):
+    """ELO-first B1 (decay_urge): past max lifespan standing yield bleeds 1 unit per 2
+    TURNS (official spec; constants.py lifespan table) -- a 6-unit melon rots inside half
+    a day. The weed probe found most "weeds" are decayed FINISHED plants: grown produce
+    never sold. The escalation prices the job at units-on-tile and lifts it into
+    TIER_RESCUE so it outranks ordinary FERT/GROW work on over-subscribed days.
+    """
+
+    def _params(self, **over):
+        p = dict(PARAMS)
+        p.update(dict(decay_urge=1, weed_dig=True, fert=False))
+        p.update(over)
+        return p
+
+    def test_decayed_melon_escalates_to_rescue(self):
+        from kagfarm.policy import collect_jobs
+        tiles = _blank_tiles()
+        tiles[3][3] = _plant("MELON", age=13, units=6, watered=True)
+        prices = {"MELON": 250}
+        jobs = collect_jobs(tiles, ("NW",), 13, prices, {}, {}, self._params(),
+                            fert_stock=0, animals=None)
+        mel = [j for j in jobs if j["op"][0] == "HARVEST"]
+        self.assertTrue(mel)
+        self.assertEqual(mel[0]["tier"], 50)             # TIER_RESCUE
+        self.assertEqual(mel[0]["value"], 6 * 250)       # standing units, per-turn value
+
+    def test_pre_decay_melon_keeps_harvest_tier(self):
+        from kagfarm.policy import collect_jobs
+        tiles = _blank_tiles()
+        tiles[3][3] = _plant("MELON", age=10, units=6, watered=True)
+        prices = {"MELON": 250}
+        jobs = collect_jobs(tiles, ("NW",), 10, prices, {}, {}, self._params(),
+                            fert_stock=0, animals=None)
+        mel = [j for j in jobs if j["op"][0] == "HARVEST"]
+        self.assertTrue(mel)
+        self.assertEqual(mel[0]["tier"], 40)             # TIER_HARVEST (shipped)
+
+    def test_knob_off_is_shipped_tiering(self):
+        from kagfarm.policy import collect_jobs
+        tiles = _blank_tiles()
+        tiles[3][3] = _plant("MELON", age=13, units=6, watered=True)
+        prices = {"MELON": 250}
+        jobs = collect_jobs(tiles, ("NW",), 13, prices, {}, {}, self._params(decay_urge=0),
+                            fert_stock=0, animals=None)
+        mel = [j for j in jobs if j["op"][0] == "HARVEST"]
+        self.assertTrue(mel)
+        self.assertEqual(mel[0]["tier"], 40)
+
+    def test_decay_clock_boundaries(self):
+        from kagfarm.constants import decay_clock_running
+        # one_time: bleeding starts AT lifespan_days
+        self.assertFalse(decay_clock_running("WHEAT", 4))
+        self.assertTrue(decay_clock_running("WHEAT", 5))
+        self.assertFalse(decay_clock_running("MELON", 12))
+        self.assertTrue(decay_clock_running("MELON", 13))
+        # ongoing: the day after the last scheduled yield
+        self.assertFalse(decay_clock_running("STRAWBERRY", 16))
+        self.assertTrue(decay_clock_running("STRAWBERRY", 17))
+        self.assertFalse(decay_clock_running("TOMATO", 11))
+        self.assertTrue(decay_clock_running("TOMATO", 12))
+        # unknown crop: never raises, never true
+        self.assertFalse(decay_clock_running("BANANA", 99))
+
+
+class TestEndgameShift(unittest.TestCase):
+    """ELO-first C (endgame_shift): a TRAILING close (public rival money, the gap above
+    10% of the board's base-equivalent value) enters the full-clear regime one day early
+    -- the reserve floors come off d24 instead of d25. Never fires when leading/tied;
+    leading games keep the metered regime that won the close field games.
+    """
+
+    def _pol(self, **over):
+        over.setdefault("endgame_shift", 1)
+        over.setdefault("endgame_shift_gap", 0.10)
+        pol = Policy(dict(over))              # real ctor: _market_orders touches runtime state
+        pol.eff_endgame = None
+        return pol
+
+    def _obs(self, day, hour, opp_money, my_money):
+        tiles = _blank_tiles()
+        for row in tiles:
+            for i in range(BOARD_SIZE):
+                row[i] = None
+        return {"player": 0, "day": day, "hour": hour,
+                "farms": [
+                    {"money": my_money, "tiles": tiles, "farmer": [4, 4], "hands": [],
+                     "unlocked_quadrants": ["NW"], "hires_today": 0},
+                    {"money": opp_money, "tiles": _blank_tiles(), "farmer": [4, 4],
+                     "hands": [], "unlocked_quadrants": ["NW"], "hires_today": 0},
+                ],
+                "market": {"inventory": {}, "prices": {}},
+                "town": {"unlocked_shops": []},
+                "private": {"shed": {}, "seeds": {}, "inventories": [{}]}}
+
+    def _run_turn(self, pol, day, hour, opp_money, my_money):
+        obs = self._obs(day, hour, opp_money, my_money)
+        return pol._market_orders(obs, obs["farms"][0], {}, {}, {}, {}, ("NW",), day, hour)
+
+    def test_trailing_big_gap_fires_shift(self):
+        pol = self._pol()
+        self._run_turn(pol, day=24, hour=0, opp_money=30000.0, my_money=8000.0)
+        self.assertEqual(pol.eff_endgame, 24)     # shift fired: full-clear starts d24
+        self.assertEqual(pol._effective_endgame(), 24)
+
+    def test_leading_game_never_fires(self):
+        pol = self._pol()
+        self._run_turn(pol, day=24, hour=0, opp_money=8000.0, my_money=30000.0)
+        self.assertIsNone(pol.eff_endgame)
+        self.assertEqual(pol._effective_endgame(), 25)   # shipped form intact
+
+    def test_small_gap_is_market_noise(self):
+        pol = self._pol()
+        # $750 raw gap == the 10% floor; needs to exceed it -> stays shipped.
+        self._run_turn(pol, day=24, hour=0, opp_money=8750.0, my_money=8000.0)
+        self.assertIsNone(pol.eff_endgame)
+
+    def test_wrong_day_never_fires(self):
+        pol = self._pol()
+        for d in (20, 23, 25, 26, 28):
+            self._run_turn(pol, day=d, hour=0, opp_money=30000.0, my_money=8000.0)
+        self.assertIsNone(pol.eff_endgame)               # only day==_we-1==24 can arm
+
+    def test_shift_holds_through_recovery_and_resets_next_episode(self):
+        pol = self._pol()
+        self._run_turn(pol, day=24, hour=0, opp_money=30000.0, my_money=8000.0)
+        self.assertEqual(pol.eff_endgame, 24)
+        # Recovery by d25 keeps the early full-clear running (one-sided, no oscillation).
+        self._run_turn(pol, day=25, hour=0, opp_money=8000.0, my_money=30000.0)
+        self.assertEqual(pol.eff_endgame, 24)
+        # New episode (day 0): pooled-process guard resets the fired shift.
+        self._run_turn(pol, day=0, hour=0, opp_money=30000.0, my_money=8000.0)
+        self.assertIsNone(pol.eff_endgame)
+
+    def test_sell_floors_come_off_a_day_early(self):
+        pol = self._pol()
+        shed = {"STRAWBERRY": 10}
+        prices = {"STRAWBERRY": 25}                       # 10% of base: every shipped floor refuses
+        glut = {"STRAWBERRY": 10100}                      # I0+T -> book price $1, deep glut
+        # d23, unshifted: reserve floor holds, nothing sells.
+        out = pol._sell_orders(shed, glut, prices, None, day=23, unlocked=("NW",))
+        self.assertEqual(out, [])
+        # Arm the shift, then d24: full-clear regime, floors off, stock sells at any price.
+        pol.eff_endgame = 24
+        out = pol._sell_orders(shed, glut, prices, None, day=24, unlocked=("NW",))
+        self.assertTrue(any(o[0] == "SELL" and o[1] == "STRAWBERRY" for o in out))
+
+    def test_knob_off_keeps_shipped_endgame(self):
+        pol = self._pol(endgame_shift=0)
+        self._run_turn(pol, day=24, hour=0, opp_money=30000.0, my_money=8000.0)
+        self.assertIsNone(pol.eff_endgame)
+        self.assertEqual(pol._effective_endgame(), 25)
+
+
+class TestTickBurst(unittest.TestCase):
+    """0925b P1: mid-season floor-eligible sells burst so town drains lift the book."""
+
+    def _pol(self, burst=3):
+        pol = Policy({"elite_script": True, "opening_led": False,
+                      "tick_burst": burst})
+        pol.animals = None
+        return pol
+
+    def test_burst_caps_pile_and_renames_remainder(self):
+        pol = self._pol(3)
+        shed = {"STRAWBERRY": 10}
+        sell = pol._sell_orders(shed, {"STRAWBERRY": 0}, {"STRAWBERRY": 200},
+                                None, 15, {"NW"})
+        self.assertEqual([s for s in sell if s[1] == "STRAWBERRY"],
+                         [["SELL", "STRAWBERRY", 3]])
+        # 7 remain and re-offer next turn.
+
+    def test_zero_keeps_shipped_full_pile(self):
+        pol = Policy({"elite_script": True, "opening_led": False, "tick_burst": 0})
+        pol.animals = None
+        shed = {"STRAWBERRY": 10}
+        sell = pol._sell_orders(shed, {"STRAWBERRY": 0}, {"STRAWBERRY": 200},
+                                None, 15, {"NW"})
+        self.assertIn(["SELL", "STRAWBERRY", 10], sell)
+
+    def test_always_sell_and_endgame_bypass_burst(self):
+        # MELON is always_sell: the full clear survives even with a burst armed.
+        pol = self._pol(3)
+        shed = {"MELON": 10}
+        sell = pol._sell_orders(shed, {"MELON": 0}, {"MELON": 240}, None, 15, {"NW"})
+        self.assertIn(["SELL", "MELON", 10], sell)
+        # Endgame full-clear bypasses the burst.
+        shed = {"STRAWBERRY": 10}
+        sell = pol._sell_orders(shed, {"STRAWBERRY": 0}, {"STRAWBERRY": 200},
+                                None, SEASON_DAYS - 1, {"NW"})
+        self.assertIn(["SELL", "STRAWBERRY", 10], sell)
+
+
+class TestCrowdPremiumFloor(unittest.TestCase):
+    """0925b P2: the crowded valve strands premium units at the normal reserve floor."""
+
+    def _pol(self, on):
+        pol = Policy({"elite_script": True, "opening_led": False,
+                      "crowd_premium_floor": 1 if on else 0})
+        pol.animals = None
+        return pol
+
+    def test_armed_valve_strands_premium_at_glut(self):
+        pol = self._pol(True)
+        shed = {"STRAWBERRY": 10, "WHEAT": 88}
+        # Book price $24: above the crater floor (0.5 x 1.1 x 120 = 66? no -- 0.5x1.1x120=66;
+        # $24 is below both floors). Price between the two floors instead:
+        # crater 66 vs reserve 132 -> price $80 strands under reserve, clears under crater.
+        sell = pol._sell_orders(shed, {"STRAWBERRY": 10020}, {"STRAWBERRY": 80},
+                                None, 15, {"NW"})
+        self.assertEqual([s for s in sell if s[1] == "STRAWBERRY"], [])
+
+    def test_off_valve_clears_premium_at_crater(self):
+        pol = self._pol(False)
+        shed = {"STRAWBERRY": 10, "WHEAT": 88}
+        sell = pol._sell_orders(shed, {"STRAWBERRY": 10020}, {"STRAWBERRY": 80},
+                                None, 15, {"NW"})
+        self.assertTrue(any(s[1] == "STRAWBERRY" and s[2] > 0 for s in sell))
+
+    def test_staples_still_relieve_when_armed(self):
+        pol = self._pol(True)
+        shed = {"STRAWBERRY": 10, "WHEAT": 88}
+        sell = pol._sell_orders(shed, {"WHEAT": 10080}, {"WHEAT": 25},
+                                None, 15, {"NW"})
+        self.assertTrue(any(s[1] == "WHEAT" and s[2] > 0 for s in sell))
+
+
+class TestMarginalHold(unittest.TestCase):
+    """0925b P4: `_marginal_hold` prices the pile against its future head.
+
+    Properties: flat book -> False (identical to the shipped static floor);
+    book with heavy own-pipeline incoming -> False (sell through); near-empty
+    book with no pipeline -> True (hold for the rise)."""
+
+    def test_flat_book_sells(self):
+        # Head at I0 with no pipeline and 1/day drain: future head rises slightly
+        # (drain outpaces the zero pipeline)... so assert the DECISION, not a
+        # number: with pipeline == drain the two means are equal -> False.
+        self.assertFalse(_marginal_hold("STRAWBERRY", 5, 10000, [], ("NW",),
+                                        {}, 15, 3,
+                                        unlocked_shops=["FARMERS_MARKET"]))
+
+    def test_rising_book_holds(self):
+        # Near-empty book ($1,000 inv: deep scarcity) + heavy drain + no pipeline:
+        # future head is scarcer still -> future mean > now mean -> hold.
+        self.assertTrue(_marginal_hold("STRAWBERRY", 5, 1000, [], ("NW",),
+                                       {}, 15, 3,
+                                       unlocked_shops=["FARMERS_MARKET", "FARMERS_MARKET",
+                                                       "FARMERS_MARKET"]))
+
+    def test_falling_book_sells_through(self):
+        # Head at I0, big own pipeline (60 strawberry units committed), light drain:
+        # future head is much larger -> future mean < now mean -> sell through.
+        tiles = _blank_tiles()
+        for y in range(5):
+            for x in range(BOARD_SIZE):
+                tiles[y][x] = {"kind": "PLANT", "crop": "STRAWBERRY"}
+        self.assertFalse(_marginal_hold("STRAWBERRY", 5, 10000, tiles, ("NW",),
+                                        {}, 15, 3,
+                                        unlocked_shops=["FARMERS_MARKET"]))
+
+    def test_zero_n_and_saturated_head_never_hold(self):
+        self.assertFalse(_marginal_hold("STRAWBERRY", 0, 5000, [], ("NW",), {}, 15, 3))
+        self.assertFalse(_marginal_hold("STRAWBERRY", 5, I0, [], ("NW",), {}, 15, 3))
+
+    def test_off_arm_is_byte_identical_shipped(self):
+        shed = {"STRAWBERRY": 5}
+        pol_on = Policy({"elite_script": True, "opening_led": False,
+                         "marginal_sell": 1, "marginal_horizon": 3})
+        pol_off = Policy({"elite_script": True, "opening_led": False})
+        for p in (pol_on, pol_off):
+            p.animals = None
+        args = (shed, {"STRAWBERRY": 10000}, {"STRAWBERRY": 120})
+        self.assertEqual(pol_on._sell_orders(*args, None, 15, ("NW",)),
+                         pol_off._sell_orders(*args, None, 15, ("NW",)))
+
+
+
+class TestFlockArm(unittest.TestCase):
+    """0925f flock_arm: arms the built led_flock funded opening on the default arm.
+
+    Step-1 probe (seed 731180114, judge 886): shipped defaults run NO d0 script --
+    no BUY_ANIMAL until the dawn planner's d13 trickle, FEED=0 through d13, the
+    $2.1k dossier herd never exists. led_flock machinery (flock + bridge + k-admit)
+    is fully built but never defaulted; this knob is its default-arm test.
+    """
+
+    def test_knob_arms_led_flock_on_default_arm(self):
+        pol = Policy({"flock_arm": 1})
+        self.assertTrue(pol.p["led_flock"])
+        self.assertFalse(pol.p["elite_script"])
+        self.assertFalse(pol.p["opening_led"])
+
+    def test_knob_inert_on_elite_and_led_arms(self):
+        self.assertFalse(Policy({"flock_arm": 1, "elite_script": True}).p["led_flock"])
+        self.assertFalse(Policy({"flock_arm": 1, "opening_led": True}).p["led_flock"])
+
+    def test_off_is_shipped_default(self):
+        self.assertFalse(Policy().p["led_flock"])
+
+    def test_default_arm_buys_no_animals_d0_without_knob(self):
+        # The 0925f probe finding, pinned: shipped d0 emits no BUY_ANIMAL.
+        pol = Policy()
+        me = {"tiles": _blank_tiles(), "unlocked_quadrants": ["NW"], "money": 3000,
+              "hires_today": 0, "farmer": [4, 4]}
+        out = pol._market_orders({}, me, {}, {}, {}, {"WHEAT": 25, "MILK": 160,
+                                                      "WOOL": 200, "MELON": 250,
+                                                      "STRAWBERRY": 120},
+                                 ("NW",), 0, 1)
+        self.assertFalse(any(o[0] == "BUY_ANIMAL" for o in out))
+
+    def test_flock_arm_emits_animal_orders_d0(self):
+        pol = Policy({"flock_arm": 1})
+        me = {"tiles": _blank_tiles(), "unlocked_quadrants": ["NW"], "money": 3000,
+              "hires_today": 0, "farmer": [4, 4]}
+        out = pol._market_orders({}, me, {}, {}, {}, {"WHEAT": 25, "MILK": 160,
+                                                      "WOOL": 200, "MELON": 250,
+                                                      "STRAWBERRY": 120},
+                                 ("NW",), 0, 1)
+        self.assertTrue(any(o[0] == "BUY_ANIMAL" for o in out))
+        # The bridge is priced WITH the buys: at least one grain order accompanies.
+        self.assertTrue(any(o[0] == "BUY_PRODUCT" and o[1] == "WHEAT" for o in out))
+
+
+class TestWaveShareAnimal(unittest.TestCase):
+    """0925f wave_share_animal: settled windfall share extends the k-admit bound."""
+
+    def _pol(self, share, wave=0.0, money=20000):
+        pol = Policy({"flock_arm": 1, "wave_share_animal": share})
+        pol.wave_cash = wave
+        return pol
+
+    def _plan_nbuy(self, pol):
+        shed = {"WHEAT": 60}
+        prices = {"WHEAT": 25, "MILK": 160, "WOOL": 200, "EGG": 50,
+                  "FERTILIZER": 100}
+        plan = pol._animal_plan(_blank_tiles(), {"NW"}, 15, {}, prices, shed, 20000)
+        return (plan or {}).get("n_buy", 0), plan
+
+    def test_windfall_buys_extra_mouths(self):
+        # wave_cash 4000 x 0.3 / $400 = 3 extra mouths above the base admit.
+        base, _ = self._plan_nbuy(self._pol(0.0))
+        boosted, plan = self._plan_nbuy(self._pol(0.3, wave=4000.0))
+        self.assertGreater(boosted, base)
+        self.assertLessEqual(plan["n_buy"], plan["gates"]["want"] - plan["gates"]["live"]
+                             - plan["gates"]["held"])
+
+    def test_zero_share_is_shipped(self):
+        a, _ = self._plan_nbuy(self._pol(0.0, wave=4000.0))
+        b, _ = self._plan_nbuy(Policy({"flock_arm": 1}))
+        self.assertEqual(a, b)
+
+    def test_boost_never_exceeds_herd_headroom(self):
+        # want - live - held bounds the boost even with an enormous windfall.
+        pol = self._pol(0.9, wave=100000.0)
+        _, plan = self._plan_nbuy(pol)
+        g = plan["gates"]
+        self.assertLessEqual(plan["n_buy"], g["want"] - g["live"] - g["held"])
+
+
+class TestEndgameFloor(unittest.TestCase):
+    """0925g endgame_floor: the full-clear's own depth can walk a premium book to the
+    $1 floor mid-sale (tape 112960536: 560 strawberry at $1 average vs the $250 book).
+    The knob pauses a collapsed-price good for the day; d29 and always_sell exempt."""
+
+    def _sell(self, floor, shed, px, day, peak=300.0):
+        pol = Policy({"endgame_floor": floor})
+        pol.px_peak["STRAWBERRY"] = peak
+        return pol._sell_orders(shed, {"STRAWBERRY": 10000}, {"STRAWBERRY": px},
+                                None, day, ("NW",))
+
+    def test_collapsed_book_pauses(self):
+        # live $1 < 0.3 x peak $300 -> no strawberry sell mid-season.
+        out = self._sell(0.3, {"STRAWBERRY": 40}, 1, 27)
+        self.assertFalse(any(o[1] == "STRAWBERRY" for o in out))
+
+    def test_healthy_book_clears(self):
+        # live $250 >= 0.3 x $300 -> shipped full-clear proceeds.
+        out = self._sell(0.3, {"STRAWBERRY": 40}, 250, 27)
+        self.assertTrue(any(o[1] == "STRAWBERRY" for o in out))
+
+    def test_final_day_overrides_the_pause(self):
+        # d29: nothing scores after this; even a collapsed book clears.
+        out = self._sell(0.3, {"STRAWBERRY": 40}, 1, 29)
+        self.assertTrue(any(o[1] == "STRAWBERRY" and o[2] == 40 for o in out))
+
+    def test_always_sell_exempt(self):
+        # MELON's tail units still score: the cohort is capped at source, the clear IS
+        # the drain, and a paused melon just rots. Exercised via STRAWBERRY-free shed.
+        pol = Policy({"endgame_floor": 0.3})
+        pol.px_peak["MELON"] = 300.0
+        out = pol._sell_orders({"MELON": 30}, {"MELON": 10000}, {"MELON": 1},
+                               None, 27, ("NW",))
+        self.assertTrue(any(o[1] == "MELON" for o in out))
+
+    def test_off_is_shipped(self):
+        # 0 = shipped byte-identical form: collapsed book still clears mid-season.
+        out = self._sell(0, {"STRAWBERRY": 40}, 1, 27)
+        self.assertTrue(any(o[1] == "STRAWBERRY" for o in out))
+
+    def test_no_peak_never_pauses(self):
+        # A good with no season peak recorded (px_peak 0) cannot be judged collapsed.
+        pol = Policy({"endgame_floor": 0.3})
+        out = pol._sell_orders({"STRAWBERRY": 40}, {"STRAWBERRY": 10000},
+                               {"STRAWBERRY": 1}, None, 27, ("NW",))
+        self.assertTrue(any(o[1] == "STRAWBERRY" for o in out))
+
+
+class TestOppAcreageSupply(unittest.TestCase):
+    """0925i wave-cap: the opponent's PUBLIC acreage predicts their future wave (the
+    forward complement to the monitor's backward residual)."""
+
+    def _tiles(self):
+        t = [[None] * 10 for _ in range(10)]
+        t[1][1] = {"kind": "PLANT", "crop": "STRAWBERRY", "planted_day": 12,
+                   "yield_units": 3, "max_lifespan_step": -1}
+        t[2][2] = {"kind": "PLANT", "crop": "WHEAT", "planted_day": 14,
+                   "yield_units": 2, "max_lifespan_step": 1}
+        return t
+
+    def test_one_time_uses_standing_over_horizon(self):
+        out = opp_acreage_supply(self._tiles(), 18, 1.0)
+        self.assertAlmostEqual(out["WHEAT"], 2.0 / 4.0)   # standing units / harvest_day
+
+    def test_ongoing_includes_scheduled_future(self):
+        out = opp_acreage_supply(self._tiles(), 18, 1.0)
+        # strawberry: 3 standing + scheduled productions still to fire, over 16d
+        self.assertGreater(out["STRAWBERRY"], 3.0 / 16.0)
+
+    def test_zero_weight_inert(self):
+        self.assertEqual(opp_acreage_supply(self._tiles(), 18, 0.0), {})
+
+    def test_empty_board_inert(self):
+        self.assertEqual(opp_acreage_supply([[None] * 10 for _ in range(10)], 18, 1.0), {})
+
+    def test_knob_default_off(self):
+        self.assertEqual(Policy().p["opp_acreage_credit"], 0.0)

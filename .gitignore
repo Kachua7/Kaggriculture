@@ -1,39 +1,47 @@
-# python
+# build / cache
 __pycache__/
 *.py[cod]
 .venv/
 .DS_Store
 
-# calibration output: the real engine's source is Kaggle's, not ours to vendor.
-# Re-vendor it locally with `bash bootstrap.sh` (pinned by MANIFEST.sha256 logic in
-# requirements-real.txt); the vendored dirs must never be committed.
-calibration/engine/
-calibration/engine-1.32.2/
+# calibration output: the real engine's source is Kaggle's, not ours to vendor
 calibration/real_engine/
 calibration/truth.json
 calibration/versions.txt
+# the vendored interpreter dirs are content-pinned copies of Kaggle's engine for local
+# confirmation runs; diff/verify against MANIFEST.sha256 instead of committing them
+# (snapshot.sh runs `git add -A`, so these MUST stay ignored)
+calibration/engine/
+calibration/engine-1.32.2/
+# ...but the pins that make the vendoring auditable are ours:
+!calibration/engine/MANIFEST.sha256
+!calibration/engine-1.32.2/MANIFEST.sha256
 
 # eval + sweep output
 artifacts/
 *.json.gz
+replay*.json
+submission.tar.gz
+# the single-file build is a pure function of main.py + kagfarm/ and 112KB of it changes on
+# every policy edit; `bundle.py` regenerates and re-verifies it in under a second, so the
+# package commit is the record of what was submitted, not this file.
+submission/
 
-# competition replay data (Kaggle's, multi-GB): re-fetchable from the official
-# kaggriculture-episodes-* datasets via `python3 analysis/restore_replays.py --scan --download`
+# secrets
+kaggle.json
+.env
+
+# competition replay data (Kaggle's, multi-GB): re-fetchable via
+# analysis/restore_replays.py from the official kaggriculture-episodes-* datasets
 majkel1337games/
 sub10games/
 analysis/replays/
 analysis/episodes_index/
 analysis/replay_location_map.json
-replay*.json
 
-# submission packages are generated (bundle.py / pack.sh); commit the source, not the zip
-submission/
-*.tar.gz
-*.zip
-
-# day-0 opening book is captured locally from recorded episodes (capture_book.py)
-kagfarm/opening_book.json
-
-# secrets
-kaggle.json
-.env
+# stray probe files from sandbox setup — safe to delete by hand
+.writetest
+.gittest/
+# parked files the 17 Sep submit-readiness review flagged as dead weight (moved, not
+# deleted, on the user's instruction)
+useless/

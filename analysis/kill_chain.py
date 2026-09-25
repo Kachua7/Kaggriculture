@@ -51,6 +51,12 @@ def run_trace(seed, opp_name, params=None):
     opp = BUILTIN_AGENTS[opp_name]
 
     env = RealEnv(seed, ENGINE_DIR)
+    # A4 (ship 0922): RealEnv's __init__ RELOADS kagfarm.policy (bridge/real_env.py:196),
+    # wiping any pre-env PARAMS.update() -- every documented --params sweep silently ran
+    # the shipped defaults. Re-apply AFTER the env exists so the knobs actually bind
+    # (Policy instances are built lazily on the first act() call, after this point).
+    if params:
+        _policy.PARAMS.update(params)
     eng = env.eng
     sells = {}                       # (seat, good) -> [cash, units]  SETTLED
     bought_animals = [0, 0]          # PURCHASED (settled BUY_ANIMAL units)

@@ -32,7 +32,8 @@ from .constants import (ANIMAL_PRODUCT, ANIMAL_STRUCTURE, ANIMALS, BOARD_SIZE, C
                         FERT_PLAN, I0, LAND_PRICES, MARKET_PARAMS, MAX_MARKET_ORDERS, OBJECT_TABLE,
                         PROFILE_1322, PROFILE_1327, QUADRANT_ORDER, SEASON_DAYS, SHED_CAPACITY,
                         SHED_TILES, TURNS_PER_DAY, apply_engine_profile,
-                        crop_actions_per_day, drain_per_day_from_shops, fert_doses, fert_gain,
+                        crop_actions_per_day, crop_cycle_days, decay_clock_running,
+                        drain_per_day_from_shops, fert_doses, fert_gain,
                         expected_drain_per_day_horizon,
                         fib_hire_cost, gain_days, needs_water, price_for, unlocked_shops_from_obs,
                         yield_cap)
@@ -153,7 +154,7 @@ PARAMS = dict(
     # MELON is not optional -- without it the farm scores $37k -- and WHEAT earns its place in
     # the tails rather than the mean: dropping it raises the mean another $1k and costs $9k of
     # p10, because wheat's four-day cycle is what funds the first strawberry.
-    mix={"WHEAT": 9, "CARROT": 3, "MELON": 24, "STRAWBERRY": 33},
+    mix={"WHEAT": 9, "CARROT": 3, "MELON": 17, "STRAWBERRY": 33},   # 0925n M17-sheepfund: bar +10,238/-37,775 (d0 frees ~$350 for 2 sheep)
     # The ceiling binds again now that tomato is gone -- with five crops it never did, which is
     # why this was 100.0 and inert. On 144 episodes 3.0 is +$284 mean, +$688 p10, +$668 min:
     # small, but the only candidate out of a fifteen-axis sweep that improved all three.
@@ -173,7 +174,17 @@ PARAMS = dict(
     # opening -- and once the land unlocks on day 11 the marginal allocator drops melon to under
     # 8 tiles on its own, exactly as `marginal_rank` claims it should. This axis is closed.
     mix_cap=3.0,               # per-crop acreage ceiling, as a multiple of its share of the mix
-    max_hands=11,            # roster cap: s8 shepherd arm needs the 11th for the stream
+    max_hands=14,            # SHIPPED 0924d, MEASURED (adopted on bank results alone):
+                             # ENGINE TRUTH (0924g, verified in BOTH engines): hands VANISH
+                             # nightly (farm["hands"] = [] at _day_refresh, engine.py +
+                             # vendored 1.32.7 line 880) and hires_today resets -- the fib
+                             # curve re-prices the FULL roster every dawn (~$987/day at 14
+                             # hands; a recurring wage bill, real). The earlier "hands
+                             # persist, extra hands cost ~$1-5" note was wrong; 14 still won
+                             # the mirror+judge A/B it was adopted on, so the knob stays --
+                             # but any wage-sensitive tuning must price the daily bill.
+                             # 14 clears the ladder winners' op-volume gap (6.3-6.7k vs our
+                             # 5.4k unit-ops); 16+ collapses routing, 14 is the peak
                              # (measured as part of the s8 profile, real tier, 24 episodes).
                              # Was 8, where every larger roster measured as a loss -- because
                              # hands hired after the hour-1 re-cut got no route and PASSed all
@@ -221,7 +232,7 @@ PARAMS = dict(
     # the tail lives. Head-to-head cells ARE chaotic (0.45/0 beats the old cell 51/96 while
     # 0.55/2 ties it 54/96); the mutual meta is the selector that held, and it is the one whose
     # failure mode -- both farms dead -- is also the ladder's worst outcome for us.
-    windfall_pct=0.45,       # fraction of the bank the dawn seed budget may spend. [tail]
+    windfall_pct=0.50,      # 0925n Day-2 Slot-B (C2): midfield 3-1 +8,481, elite -39,846 within guard; Tâm +38,240 best-ever single judge       # fraction of the bank the dawn seed budget may spend. [tail]
     windfall_reserve=0,      # extra days of full-roster wages held back on top of half a day.
     # ---------------------------------------------------------------------------------------
     # THE PEER RETUNE. Everything below marked `[peer]` was moved by a coordinate descent run
@@ -274,7 +285,25 @@ PARAMS = dict(
                              # -> 2 is worth -$19 on its own, i.e. nothing; it is in the cell
                              # because the seven-axis cell measured $609 BETTER than the
                              # four-axis one on the built-in panel, consistently across blocks.
-    hire_hours=4,            # keep re-attempting deferred hires this far into the day
+    hire_floor_n=4,         # 0924j ADOPTED (tapes 112942073/112941859): the demand-sized
+                            # roster hired 1 hand for eight straight days on the seed-light
+                            # board (hires d0-11 = [3,0,1,0,1,0,1,1,1,1,4,14]) while the
+                            # winner ran [4,2,3,5,4,4,7,7,8,8,11,10] -- a 4-hand floor from
+                            # d0 through hire_floor_day costs fib(4)=$7/day and is what the
+                            # census actually does (hire ahead of demand, never idle the
+                            # roster). 0 = demand-sized only (byte-identical)
+    hire_floor_day=5,       # last day the hire floor applies (the census ramps past it on
+                            # wool cash, which the demand sizer then tracks on its own).
+                            # 0924j MEASURED: day=10 lifts 4/5 judges but perturbs the
+                            # post-wave board (mirror s4 -$25k tail); day=5 covers exactly
+                            # the pre-income trough (hires d0-11 = [3,0,1,0,1,0]) at
+                            # fib(4)=$7/day, keeps the mirror mean +$3.5k AND the tail
+                            # (+$12.6k on the worst seed)
+    hire_hours=4,           # keep re-attempting deferred hires this far into the day
+    hire_hours_late=10,      # majkel_skeleton catch-up window: the census roster is 12/day
+                             # from t2 with zero gaps; with led_roster_floor the fib cash gate
+                             # defers hires as cash recovers -- 4h often strands them for the
+                             # whole day, so the floor's intent is honoured to hour 10
     seed_grace=1,            # hours a PLANT job waits for its seed before being dropped. [peer]
                              # 3 -> 1, and exactly $0 on its own -- same justification as above.
     # Acreage ceiling as a multiple of the roster's daily tile-visits. Below 1.0 the farm plants
@@ -344,14 +373,63 @@ PARAMS = dict(
     # Gated off (`monitor=0`) until it wins the block gate; enables for free diagnostics.
     monitor=0,
     opp_credit=0.0,                      # weight on the monitor's opponent-supply estimate
+    # 0925i wave-cap (book-aware cohort sizing): the opponent's farm is PUBLIC every turn
+    # -- standing yield_units plus their remaining scheduled productions (fertilized tiles
+    # publicly double) predict their d25-29 endgame wave WEEKS early. Fed into the same
+    # `opp` plumbing the monitor uses (horizon_head credits it per-day-equivalent), it
+    # prices OUR planting against the book our wave will meet: under-planted near-miss
+    # worlds read cheap strawberry (plant more), over-planted self-crash worlds read
+    # expensive (pivot). Backward-looking monitor residual alone cannot do this -- it
+    # learns their past, the acreage reads their future. 0 = off, byte-identical.
+    # MEASURED-REJECTED 2026-09-25 (judge bar, both tiers): credit 0.5 mean elite
+    # -$70,559 (we stopped planting; banks collapsed) and midfield 2-2; credit 0.1
+    # midfield +$8,900 (~= baseline noise) but elite still -$48,099 (-$10.9k vs ref).
+    # Mechanism: on the elite tier our endgame wave is the MARKET-DENIAL asset
+    # (0925f) -- crediting the rival's acreage suppresses our planting and gifts
+    # them the book (their banks rose on every judge). The estimator works; the
+    # channel (planting suppression) is value-destroying where it matters. Dormant.
+    opp_acreage_credit=0.0,
+    # 0925i milk_first_wave: the 0925f bundle's ONE untested-alone component, in its
+    # minimal form -- ONE d0 cow + its bridge grain (~$550: led_wheat0=2 covers the
+    # placement gap), NO flock (led_cow2/led_sheep0 zeroed), NO backbone extension,
+    # NO dawn-planner change. First milk lands d8, so events d8-28 sell through the
+    # dossier's d13-19 first-mover window ($230-246 before the dual-herd crash).
+    # The seed round survives: the reserve nets ~$550, not the $2.1k flock (the
+    # 0925f smoke's wave killer). Cows bought later CANNOT hit the window (first
+    # yield d19+) -- d0 is the only entry. 0 = off, byte-identical.
+    # MEASURED-REJECTED 2026-09-25 (judge bar, both tiers): elite -$45,227 (guard,
+    # -$8.0k vs ref) and midfield 2-2 +$2,938 vs baseline 3-1 +$8,336 (Jiahan W->L
+    # by -$146). The d8-28 event stream through the window doesn't repay ~$550 of
+    # seed round + bridge at our service scale -- the 0925f bundle verdict holds for
+    # the minimal form too: the milk window is not reachable from the default arm's
+    # economy. Dormant.
+    milk_first_wave=0,
     sell_infer=0.0,                      # weight on the measured tau floor in _sell_orders
     # Work stealing: when a unit's queue drains while other runs still hold tail jobs, it
     # takes the nearest feasible tail rather than PASSing until midnight. Tail-only so the
     # owner keeps its head and the steal costs them at most their last job; `then` jobs
     # (WATER-after-PLANT) are never stolen. Off by default pending the block gate.
+    idle_recut=0,           # 0924h seam 1: evening residual re-cut for idle units (see
+                            # _act). 0 = byte-inert; the arm flips it to 1.
     work_steal=1,            # adopted 17 Sep on the corrected mirror: 4-block ADOPT (+$229
                              # aggregate, every block positive, 192 seeds x 3 opponents).
                              # The old INCONCLUSIVE was partly the H2 seat-0 quote bias.
+    # -- s1223 move-share build (luanhe/juicy autopsies: ours 69% moves vs elite 59%).
+    # lane_keep: mid-day recuts (roster growth) rebuild every lane from the whole
+    # remaining job list, re-pointing standing units' heads (measured: 561 redirects,
+    # 378 far -- Manhattan >= 4 -- per episode; the valley d12-17 pays the most).
+    # Lane-keep mode keeps every in-progress queue and routes only the NEW jobs to
+    # the lanes with spare budget (appended at the tail, contiguity preserved).
+    # roster_adaptive: a NEW hand does not walk the farm's mean commute -- it slots
+    # into the edge of an existing lane, so its incremental walk shrinks with the
+    # number of live lanes. The demand-sized roster was computed at commute 3-6 for
+    # EVERY hire; the valley's hire batches were under-rostered as a result.
+    lane_keep=False,
+    # roster_adaptive RETIRED same-session (s1223): the commute shrink lowers
+    # per_unit capacity, which LOWERS the demand-sized roster -- the valley hire
+    # batches got smaller, not larger (mirror seed 0: $59.7k -> $35.8k). The
+    # under-roster fix is a bigger `max_hands` question, not a commute question.
+    roster_adaptive=False,
     # Opening book (days 0..book_until_day-1). `opening_book=1` serves the donor script
     # recorded in `book_file` while a per-day signature (public shop unlocks + our own
     # money/shed/seeds totals) matches what the donors saw; any miss halts the book for
@@ -385,6 +463,132 @@ PARAMS = dict(
     # 144: mean $79.8k -> $85.9k train, $80.8k -> $87.0k held-out, p10 +$4.2k/+$4.4k, and the
     # curve is single-peaked -- 4 is $2.4k worse, 6 is $1.0k worse, 8 gives back half the gain.
     endgame_days=5,
+    # -- ELO-first package (2026-09-25). The Bradley-Terry ledger: only W/L moves rating,
+    # margin does not -- losing to a 3200 elite costs almost nothing, the coin-flip band
+    # (vs mid-field) is where the rating dies.
+    # B1 decay_urge: past max_lifespan_step standing yield bleeds 1 unit per 2 TURNS --
+    # a 6-unit melon rots inside half a day (constants.decay_clock_running). The weed
+    # probe's finding (most "weeds" are decayed FINISHED plants) is this produce: paid,
+    # grown, never sold. Escalates the bleeder's harvest into TIER_RESCUE so it outranks
+    # ordinary FERT/GROW work. 0 = byte-identical shipped tiering.
+    # MEASURED-REJECTED 2026-09-25 (judge bar, 5 judges, recorded seeds): byte-identical
+    # on 4/5, juicy -$1.2k. Decay-state tiles barely exist on elite boards: the ordinary
+    # plan harvests at harvest_day and lifespan starts a day later, so a bleeding tile
+    # only appears on an over-subscribed day -- exactly the day the escalation displaces
+    # other work whose cost exceeds the rotted units. Dormant for the P5 tuner.
+    decay_urge=0,
+    # C endgame_shift: in a TRAILING close (public rival money, the gap above
+    # endgame_shift_gap x base-equivalent board value) enter the full-clear regime ONE
+    # day early -- reserve floors come off d24 instead of d25. Never fires when leading
+    # or tied; leading games keep the metered drip that won 112945796/112946976.
+    # 0 = off (byte-identical shipped form).
+    # MEASURED-REJECTED 2026-09-25 (judge bar): mean -$1.5k (900 +$2.0k, 907 -$4.8k with
+    # OUR bank DOWN $3.5k and the judge's UP). The panic-clear hypothesis is wrong on the
+    # real tier even when trailing: the d26-29 full-clear window is NOT time-starved, the
+    # overnight price recovery between metered waves out-earns selling a day earlier into
+    # the glut, and the shift just grew the judge's own realized prices. What loses close
+    # games is the SIZE of the endgame wave, not its timing. Dormant for the P5 tuner.
+    endgame_shift=0,
+    endgame_shift_gap=0.10,
+    # 0925g endgame_floor: price-aware endgame metering. The full-clear's own depth can
+    # walk a premium book to the $1 floor MID-SALE (tape 112960536: 560 strawberry at $1
+    # average vs the $250 book -- ~$100k of self-inflicted destruction), and a $1 unit is
+    # worse than unsold: the engine does not add floor-priced units to market inventory,
+    # so the sale burns value AND leaves our remaining stock no recovery signal. While a
+    # good's live price sits below endgame_floor_frac x its season peak (px_peak, exact
+    # per-turn public read), its endgame clear pauses for the day -- the town drain
+    # recovers the book between waves (the mechanism the 0925a reject validated); d29
+    # clears regardless (nothing scores after) and always_sell goods (MELON, cohort
+    # capped at source) are exempt -- their $1 tail units still score. 0 = off,
+    # byte-identical shipped full-clear.
+    # MEASURED-REJECTED 2026-09-25 (judge bar): mean -$41,930 vs baseline -$37,243;
+    # byte-identical 2/5, 900 +$2.2k (small wave recovers), luanhe -$23.0k (the paused
+    # units never recovered -- the town drain cannot lift a book that size before d29,
+    # so the pause converted a descending-price cascade into a d29 $1 clear). Mechanism
+    # verdict: the $1 self-crash (112960536) is caused by the WAVE SIZE hitting the
+    # book, not the sell order -- post-crash holding creates no value. The fix is
+    # upstream (cohort sizing), not in the sell layer. Dormant for the P5 tuner.
+    endgame_floor=0,
+    # -- 0925b no-waste package (three dormant knobs, W/L judge bar gated) --------------
+    # P1 tick_burst: the mid-season floor-eligible sell pile is BURST-CAPPED at this
+    # many units per turn (0 = off, shipped full-pile sell). The price curve is
+    # per-unit sequential and the town shops drain every 4th turn, so a q-unit
+    # one-turn sell walks the book down all q units while a burst lets the
+    # deterministic drains lift the book between turns -- same units, strictly
+    # higher realized prices. The pile is re-named from the live shed every turn, so
+    # the remainder is re-offered next turn at no cost. always_sell (MELON), the
+    # crowded valve, and the endgame full-clear are untouched: all three carry
+    # measured do-not-meter verdicts (see the branches in _sell_orders).
+    # MEASURED (judge bar, 5 judges, recorded seeds): <verdict>
+    tick_burst=0,
+    # P2 crowd_premium_floor: when the crowded-shed valve opens, premium goods
+    # (STRAWBERRY/MILK/WOOL -- _PREMIUM_HOLD_GOODS) keep the NORMAL reserve floor
+    # instead of crowd_floor_frac x reserve x base (0 = off). Overflow discards
+    # INCOMING bags at midnight, not shed stock, so stranding premium units is
+    # cheaper than dumping them at a quarter of base; the valve still relieves
+    # through staples and inputs (its own contract). The crowded branch exists
+    # because "refusing a sale destroys it" -- but that argument prices an INCOMING
+    # bag (which will otherwise be discarded), not stock already safe in the shed.
+    # MEASURED (judge bar): <verdict>
+    crowd_premium_floor=0,
+    # P4 marginal_sell: the mid-season floor loop sells the largest prefix of the
+    # pile whose mean now-price still beats the same prefix's mean at the FUTURE
+    # head -- current inventory + marginal_horizon days of (own committed pipeline
+    # spread over the crop's cycle - exact town drain). Flat market -> identical to
+    # the shipped static floor (means are equal -> sell the pile); falling market ->
+    # sell through; rising market -> hold. MILK/WOOL keep their dedicated windows
+    # (measured); MELON is always_sell and never reaches this branch; endgame and
+    # the crowded valve are untouched. 0 = off, byte-identical.
+    # MEASURED (judge bar): <verdict>
+    marginal_sell=0,
+    marginal_horizon=3,
+    # -- 0925f production-side package (the 0925c kill-chain verdict: the mid-game
+    # stall is two ANIMAL-LANE starvations, not idle capital or sell timing) --------
+    # flock_arm: arm the built-but-never-defaulted led_flock funded opening on the
+    # DEFAULT arm. Step-1 probe (seed 731180114, judge 886): the d0 script never
+    # fires at all on shipped defaults (opening_led/elite_script/led_flock all
+    # False) -- no BUY_ANIMAL until the dawn planner's d13 2-3 animal trickle, the
+    # $2.1k dossier herd never exists, FEED ops = 0 through d13, 0 milk sold on
+    # 886. The led_flock machinery is fully built (stage-1 cow + led_wheat0 grain,
+    # stage-2 flock with _top_grain before/after EVERY buy = the bridge is priced
+    # in, reserve netting protects the seed round, k-admit field-cadence money
+    # gate replaces the pace*cost*2 wall) and was measured-safe on the elite arm
+    # ($30.5k seed 0); the 0923 note calls it "the untested C variant". This knob
+    # is the test: 0 = byte-identical shipped defaults.
+    # MEASURED (judge bar, 5 judges, recorded seeds): REJECTED, mean -$59,212 vs
+    # baseline -$37,243. Mirror self-play said +$17-21k (herd 11, milk $22.4k alive)
+    # -- the bar caught what the mirror cannot: the judge's bank EXPLODES on the freed
+    # book (886: $74k recorded -> $132k; we suppress it with the melon wave, the flock
+    # sacrifices it). The milk lane also arrives after the d13-19 first-mover window
+    # (dossier: $230-246 early, $40-80 crash) -- at our service scale the herd costs
+    # more crop income than its milk returns. Dormant for the P5 tuner.
+    flock_arm=0,
+    # flock_stage2_mode: the flock's day-0 seed coexistence form (the 0925f smoke on
+    # judge 886: whole-flock netting at t0 pushed the seed round to the $300 floor and
+    # the melon wave fell $17.4k -> $3.3k -- the wave IS the default arm's mid-game
+    # economy). 0 = elite raw form (byte-identical); 1 = stage-1-only opening (t1
+    # emits the founding cow + grain; stage-2 targets are zeroed for the whole script
+    # span so the reserve and the stage-2 gates net stage 1 only, and the deferred
+    # mouths are the dawn planner's job -- k-admit plus wave_share_animal fund them
+    # from the waves); 2 = same-turn surplus form (whole flock competes at t0, every
+    # stage-2 mouth must leave the bank >= seed_floor). Only consulted when flock_arm
+    # is on and the elite arm is off.
+    # MEASURED: mode 0 -$59,212, mode 1 -$56,853 (mode-0 form minus the wave
+    # sacrifice, still loses: the backbone wheat acreage + flock labor cost more than
+    # the late-window milk returns), mode 2 not reached (dominated). Dormant.
+    flock_stage2_mode=0,
+    # wave_share_animal: the unspent remainder of a settled windfall (dawn-to-dawn
+    # bank delta) funds continuous herd expansion -- share x wave_cash / animal
+    # cost, added to the dawn admit bound, so the k-admit afford loop prices the
+    # bridge for the larger k (never an unfunded mouth). Boost requires the
+    # species in_time window (cow 19 / sheep 20 / goose 24), feed_ok and
+    # buffer_ok; it is what turns the d6 wool pop and the d10-11 melon wave into
+    # the judges' 14-21 placed herds instead of our 6-8 (eta_capital 0.54-0.66
+    # vs 1.13-1.66). 0 = off, byte-identical.
+    # MEASURED (judge bar): REJECTED at 0.3 bundled with flock_arm/mode 1 (-$62,787
+    # vs -$56,853 without): the wave-funded mouths deepen the same late-window milk
+    # position that loses. Dormant.
+    wave_share_animal=0.0,
     # Ladder dump-gates (2026-09-19, episode 110850828). The in-mirror field shared our own
     # dumping habits, so every previous gate on the sell RATE was measured in a vacuum; live,
     # the winners DRIP (never more than ~30 units of anything a day) and a one-turn dump
@@ -541,6 +745,9 @@ PARAMS = dict(
     led_roster_floor=0,     # minimum roster from day 0 -- MEASURED NEGATIVE (mirror seed 0:
                             # -$25k; forced 9-10 hires spend the bank to $0 daily and the
                             # cash-gated herd never assembles). Knob kept at 0 = off.
+    led_roster_ramp=0,      # majkel_skeleton: census ramp 4->5->6->7... -- target roster is
+                            # (3 + day), fib cash cap still binds. Replaces the flat floor,
+                            # whose daily wage bill bought the bank to $0 by d2.
     # -- elite_counter_v1 (2026-09-21, dossier 63-game spec). The d0 script upgraded from
     # "one cow" to the measured elite order stream: t1 COW+WHEAT-feed, t2 COW+SHEEPx3+HIREx4,
     # then a per-species ramp to a MIXED herd (cow milk engine + sheep wool lane). The knobs
@@ -549,18 +756,215 @@ PARAMS = dict(
     led_sheep0=3,           # SHEEP issued on day 0 turn 2 (wool lane, dossier 3/game)
     led_cow2=1,             # second COW issued on day 0 turn 2
     led_hire2=4,            # HIRE orders inside the t2 script block
-    herd_cow=9,             # mixed-herd target envelope (dossier: cow 9-11)
-    herd_sheep=4,           # sheep lane (dossier: 3-5; wool separates elite wins from losses)
+    herd_cow=9,             # mixed-herd target envelope (dossier: cow 9-11). Raised 0922
+                            # to 14 under the care gate; the gate failed the judges, so the
+                            # envelope reverts with it (14 without service = service dilution,
+                            # the measured F3/F6 failure mode).
+    herd_sheep=2,           # sheep lane (dossier: 3-5; wool separates elite wins from losses)
+    # Wool-lane seed cohort for the DEFAULT arm (grind 0922). The incumbency lock made the
+    # first-ranked species permanent -- on the judges that grew ALL-COW herds and left the
+    # wool market (the judge's $11.9-13.1k lane) untouched. >0 extends the elite portfolio
+    # (per-species marginal ranks + envelopes) to the default arm and forces one pace-sized
+    # SHEEP order before any cow expansion. 0 = the old single-species behaviour.
+    wool_lane=2,
     herd_goose=0,           # geese compete for service turns; off unless the panel prices them in
+    led_flock=False,        # funded opening (grind 0923): the DEFAULT arm runs the d0
+                            # script's stage-2 flock (led_cow0+led_cow2+led_sheep0) with
+                            # reserve netting + seed floor + the k-admit money gate. The
+                            # untested C variant: the flock's d6 wool pop (~$3.1k at 3
+                            # sheep) funds the windfall reinvest a lone d0 cow cannot
+                            # (opening_led alone measured -78.0k mean on the judges).
+                            # Leaves opening_led-only machinery (herd target, roster
+                            # floor, ramp bypass) untouched.
     wool_floor=0.55,        # elite WOOL sell floor past d12 (x base; trough is $40-80)
     wool_hold_price=150,    # WOOL recovery-hold floor: sell only at or above this ($/unit)
     wool_hold_cap=28,       # shed units of crashed wool held through the trough (dossier: 28)
+    # -- P3 milk first-mover window (grind 0922, judge 907 leak: we realized $49/unit into
+    # the two-herd glut while the rival realized $139). Milk is a FIRST-MOVER market:
+    # $230-246 d13-19, $38-63 once both herds saturate. When the rival's PUBLIC cow herd is
+    # glut-scale and the live price has rolled off the season peak, shed milk stops selling
+    # and waits for recovery or endgame. A small rival herd leaves the drip unchanged (the
+    # window genuinely lasts longer).
+    milk_window=True,       # master switch
+    milk_window_def=True,   # A3 (ship 0922): the milk hold is a MILK discipline -- gate it
+                            # on its own knob, not on `wool_lane > 0` (the coupling that
+                            # made wl=0 silently kill the milk window, worth $18.3k on
+                            # judge 900). True at shipped wl=2 is byte-identical; it only
+                            # diverges on the retired wl=0 arm, by design.
+    milk_window_start=13,   # first day the hold may engage (the early sales ARE the window)
+    milk_opp_glut=8,        # rival cow count that signals the glut is near (his herds: 14-16)
+    milk_hold_frac=0.8,     # hold once live milk < this x season peak (window has rolled off)
+    milk_hold_cap=40,       # max shed milk units held through the glut
+    # -- grind 0922b (F1-F5): ALL MEASURED NEGATIVE OR INERT on the Majkel judges and
+    # reverted to the validated post-P1 state. Findings preserved for the P5 tuner:
+    #   F1 d0_herd (default-arm d0 core herd): -91.7k vs -64.6k on 886 -- the netting
+    #     starves the ~$2k d0 seed round (the measured load-bearing move); the $3k bank
+    #     cannot fund both. A core herd needs the elite script's seed-floor pairing.
+    #   F2/F2b want floor: structural, reverted -- byte-inert in self-play; unproven on
+    #     judges.
+    #   F3 buffer admission: rides d0_herd, never measured independently.
+    #   F4 DIG tier 28 + weed_tiles: tier-28 is byte-inert on judges but collapsed the
+    #     skeleton to $25.9k; weed_tiles planning displaces real plants (monitor test).
+    #   F3 deadlock admission (buffer bypass at zero animals): fixes the measured mirror
+    #     seed-2 collapse ($4.1k -> $22-27.5k) but judged NEGATIVE on the panel (mean
+    #     -$3.3k; the 3 extra buys dilute service on 900/907). Behind `deadlock_admit`.
+    #   F5 asymmetric holds: byte-inert on the panel (our goods arrive after the trough).
+    #   F6 shepherd share grow (default arm): byte-inert on judges; never isolated.
+    # The remaining judged stall: animals bought 8 vs judge 16-24 (eta_capital 0.62-0.96
+    # vs 1.28-1.93) -- the service-capacity/growth seam, not the market layer.
+    d0_herd=False,          # F1: default-arm d0 core herd (see the measured negatives above)
+    d0_cow=1,               # F1 core cows (dossier minimum viable milk engine)
+    d0_sheep=2,             # F1 core sheep (wool lane seed; 3rd delayed to the windfall)
+    weed_tier=10,           # F4: DIG priority knob (DORMANT: consumer reads TIER_DIG; the
+                            # tier-28 form measured elite-toxic, judge-inert)
+    weed_tiles=False,       # F4: weeds as plantable tiles -- planning into weed slots
+                            # displaces real plants (monitor test pins the undercount)
+    animal_load_def=0.0,    # F4: default-arm animal maintenance charge in the allocator
+    care_gate=False,        # B1 (ship 0922): default-arm EXACT care test (svc_margin 3) --
+                            # dossier constants: 1 shepherd / 1.8 animals, >=88% care.
+                            # MEASURED JUDGE-NEGATIVE (0922c): caps buys at 5 animals on ALL
+                            # three judges (ref 8-11; Majkel 16-24); svc_margin 13 admits 8
+                            # but terminal drops $96.8k->$96.4k. The mirror loop-cost model
+                            # (commute=3.0) runs pessimistic vs real geometry. Dormant.
+    shepherd_share_grow=False,  # F6/B2: default-arm shepherd share grows with the herd
+                            # (1 per ~1.8 animals under care_gate; elite keeps //3 form).
+                            # Only live under care_gate; ships OFF with it.
+    feed_backbone_def=False,  # B4: default-arm feed backbone (d22-25 grain-death guard
+                            # at dossier-scale herds). Dead at herd 8-11; revisit with B1.
+    asymmetric_holds=False, # F5: wool/milk holds engage only while we out-shed the rival
+                            # 2:1. MEASURED BYTE-INERT on the 0922b panel (our goods arrive
+                            # after the trough, so the holds never fire either way); off =
+                            # legacy sell behavior. Kept for the P5 tuner.
     seed_floor=300,         # elite opening: seeds never budget below this while cash lasts
+    opp_wool_prio=1,        # SHIPPED (0924c), the biggest Majkel-margin move measured:
+                            # judges 886/907 margins +$16.8k/+$19.0k (mean -$69.4k ->
+                            # -$57.5k); byte-identical on 900/luanhe/juicy + mirror (the
+                            # sheep-max + price guards keep the lane out of real gluts).
+                            # Anti-glut arbitrage: when the RIVAL herd is cow-heavy
+                            # (milk glut coming for everyone) and runs ~no sheep, the wool
+                            # lane is the one premium pot neither herd saturates. Lifts the
+                            # sheep envelope to `opp_wool_env` and forces the portfolio pick
+                            # to SHEEP while wool still trades >= opp_wool_px x base.
+    opp_cow_glut=10,        # rival cows that count as a milk glut in progress
+    opp_sheep_max=4,        # rival sheep under which the wool pot still has room
+    opp_wool_env=8,         # sheep envelope once the arbitrage triggers
+    opp_wool_px=0.8,        # live wool price fraction of base required to keep the lane on
+    egg_lane=0,             # 0924h seam 2: khan ($21k EGG season on tape 112841387) ran
+                            # geese we never bought -- `herd_goose=0` skips GOOSE in the
+                            # portfolio loop entirely, so the EGG lane cannot open on ANY
+                            # draw. >0 lifts the GOOSE envelope to this when the demand
+                            # side is real: >= egg_lane_shops egg-demanding shops unlocked
+                            # (BAKERY/BRUNCH_SPOT, exact via drain_per_day_from_shops),
+                            # EGG still trades >= egg_lane_px x base, and the rival runs
+                            # < 4 geese (the shared pot must have room). All admission
+                            # gates (margin rank, care co-feasibility, feed_solvency,
+                            # calendar stop GOOSE d24) stay upstream -- this only aims the
+                            # portfolio, exactly like opp_wool_prio.
+    wheel_fallback=0,       # 0924i HYBRID selector: keep the chain wherever it fits
+                            # (its bulk PICKUP wins on small/mid herds -- pure-wheel lost
+                            # -7.4/-10.3/-8.9k on luanhe/juicy/907) and engage the wheel
+                            # ONLY on chain overload, which is exactly where the wheel won
+                            # (+$8.4k on 886, where the 8-sheep arbitrage overloads the
+                            # chain stream). Trigger: the chain attempt at n shepherds
+                            # fails BOTH the total-budget and max-loop admission tests.
+    wheel_plan=0,           # 0924i REBUILT SERVICE SCHEDULER: shed-anchored per-animal
+                            # trips instead of chained feed-to-feed loops. At herd 11 the
+                            # chain stream runs 97% of the day budget with ~79% of it
+                            # WALKING and one tail-cut loses 2-3 animals' feeds at once
+                            # (escape). The wheel bounds max-trip cost at ~8 turns, loses
+                            # one animal's care tail on an overloaded day, and pays ~7.2
+                            # turns/animal at Majkel's ring distances (1.6-1.8) vs the
+                            # chain's 5.9 at ring 2 -- cost-neutral where the herd lives,
+                            # cheaper where the vision says it should live. Dormant; the
+                            # 0924h evidence bar decides adoption.
+    egg_lane_shops=1,       # egg-demanding shops required before the lane can open
+    egg_lane_px=0.9,        # live EGG price fraction of base required to keep the lane on
+    sell_fert=1,            # SHIPPED 0924e: fertilizer was in _INPUTS and NEVER sold
+    fert_drip_px=0.8,       # (see sell_fert block above for the full comment)
+    opp_fert_demand=5,      # 0924g: the drip fires only when the rival's PLACED herd is
+                            # >= this many animals -- a real economy that demands fert
+                            # and sustains the shared book. Verified pack (passive
+                            # starter/heuristic twins, no herd) measured the unguarded
+                            # drip at -$2.9k (slot displacement, nobody to sell to); the
+                            # real 5-judge panel measured it +$4.0k (Majkel-class herds
+                            # 9-16). The condition composes with opp_wool_prio's pattern:
+                            # read the rival, enter the lane only when there is someone
+                            # to sell to.
+                            # mid-season -- yet every animal yields 1 unit/day (29/season),
+                            # COLLECT is paid daily, the shed caps at 100, and overflow
+                            # DESTROYS the unit after displacing a $110 strawberry. Selling
+                            # as collected converts the board's purest waste into cash; the
+                            # 0.25 floor clears the book's crater zone (25%-of-base sits at
+                            # +373 net oversupply, above any two-herd season total).
+    fert_floor_frac=0.25,   # dedicated fertilizer sell floor (fraction of base $100).
+    wage_reserve_window=10, # SHIPPED 0924d with max_hands=14: reserve prices 10 hires
+                            # (sum $143) instead of the whole cap ($986 at 14) -- the
+                            # full-cap reserve is a one-day-hire assumption that gutted
+                            # the seed round at big rosters (mh16 = mirror collapse).
+                            # (hires spread across dawns at fib-per-DAY; the full-cap
+                            # reserve is a one-day-hire assumption that guts the seed
+                            # round at max_hands >= 14). 0 = legacy full-cap sum.
+    land_cap_quads=0,       # REJECTED on judges (0924): blanket 3-quadrant cap mean -$1.0k,
+                            # luanhe -$20.4k -- in OUR crop-led build an early SE pays
+                            # (strawberry planted d<=13 finishes d29). Superseded by the
+                            # deadline form below. Kept inert for the sweep history.
+    se_last_day=13,         # SHIPPED (0924): byte-identical on 5/5 judges + mirror, zero
+                            # measured cost; blocks the too-late SE sink. The 4th quadrant
+                            # (SE, $4,000)
+                            # only pays if a profitable cycle can still FINISH. Strawberry
+                            # (16d) needs day <= 13; past that SE is a sink. 99 = off.
+    animal_stop_species=1,  # SHIPPED (0924): byte-identical on 5/5 judges + mirror, zero
+                            # measured cost; blocks NPV-negative buys the calendar stop
+                            # admits. Engine-exact: an animal needs >= 2 production
+                            # events for NPV > 0 (cost $400-500 + feed vs product price).
+                            # Event math (OBJECT_TABLE): cow D+8,+10 <= 29 -> D <= 19;
+                            # sheep D+6,+9 -> D <= 20; goose D+4,+5 -> D <= 24. The shipped
+                            # calendar stop (d25) admits NPV-negative cows at d22-24.
+    milk_floor_frac=0.5,    # SHIPPED (0924): byte-identical on 5/5 judges + mirror, zero
+                            # measured cost; deepens the drip floor into the crater zone.
+                            # MILK is the most fragile good on the board
+                            # (90%-of-base breaks at just 8 units of net oversupply). A
+                            # dedicated sell floor (fraction of base) lets the drip reach
+                            # deeper into the slide instead of stranding units that crater
+                            # anyway. 0 = off (shipped generic floor).
+    solvency_floor=0,       # RETIRED (grind 0924): the dawn-program cap family measured
+                            # negative in all 4 variants -- a capped program caps its own
+                            # future income and the bank pins to the floor. Kept inert for
+                            # the P5 tuner's sweep history.
+    feed_solvency=1,        # grind 0924d, the measured survivor: never BUY_ANIMAL unless the
+                            # cash left after the purchase covers every mouth's 6-day grain
+                            # deficit. The mirror death mode (seeds 2/3/4) was exactly this
+                            # purchase: 3 cows at d13 with $2,640 and a dry shed -> all
+                            # starved, $0 farm for 15 turns.
     expansion_cash=5,       # elite: at >= this many animal-costs in bank, margin gate opens
     feed_backbone=True,     # wheat planted to close the projected feed deficit (infrastructure)
+    seed_opening_cap=0,     # 0924j REVERTED to 0 (judge bar, recorded seeds): capping the
+                            # d0 seed round at 650 bought more animals (8 -> 11) but LOST
+                            # luanhe -$20k and 907 -$47k -- the d0 melon wave funds the
+                            # whole season's strawberry spray on the real tier, exactly
+                            # the 0920 melon_opening lesson; sc=1200 also failed (907
+                            # -$110.7k). Axis closed at every value tested.
+                            # (majkel_skeleton comment: the census opening floats ~$800;
+                            # full-mix d0 front-loading spent to $2 and idled 22 days --
+                            # true for the SCRIPT window, not for the default arm)
+    opening_float=0,        # majkel_skeleton: liquidity floor through d2 -- the census bank
+                            # never drops below ~$1.3k before the first wool pop, while ours
+                            # hit $0 by d2 and the herd died of feed/hire/care starvation at
+                            # d6 (ONE day before its first wool). Spent only via budgets that
+                            # net elite_reserve (seeds, fert, land); grain top-ups and hires
+                            # draw on live cash and thus see it only indirectly.
     service_margin=3,       # slack turns an elite shepherd loop must fit inside its unit's day
     backlog_cap=8,          # max unplaced animals in the shed before new buys pause (2x share)
     feed_bridge=4,          # days of grain that must cover every mouth before an animal buy
+    feed_floor=True,        # P2c money gate: k-scaled field-cadence floor (see _animal_plan)
+    k_admit_def=0,          # 0924j REVERTED to 0 (judge bar): the P2c field-cadence floor
+                            # on the default arm measured 886 -$17.8k, 900 +$1.8k, luanhe
+                            # -$0.3k, mean -$3.3k -- the windfall reinvest it enables is
+                            # mistimed for the default arm's cash curve. 0 = legacy wall
+                            # (byte-identical)
+    feed_days=2,            # legacy: days of grain the feed-floor must leave funded after a buy
+    feed_days_max=6,        # P2c: worst-case bridge when no wheat crop is standing (d)
+    poverty_reserve=150,    # cash the feed-floor holds back beyond cost+grain
     # Visits a day charged against the crop allocation for each structure the farm owns. Zero,
     # measured: the honest rate is 1.6, and charging it cost $30k a seed by shrinking the farm
     # to make room for work the animals then failed to fill. See `_targets`.
@@ -571,6 +975,15 @@ PARAMS = dict(
     # needed feeding (wheat at $25 base is also the cheapest thing on the board, so the sell
     # list clears it first); 12/mouth rides through cap days and still only holds 24-36.
     feed_hold=12,
+    # 0925n wheat_drip (Day-3 Slot-B candidate): the winners' daily heartbeat sells 14-71
+    # wheat units EVERY day (curve autopsies 113306910/113340821/112648567); ours pools in
+    # the shed as a 12-day/mouth feed bridge (feed_hold x mouths ~= $3k of dead working
+    # capital at 8 mouths) and never flows d13-24. When >0, the mid-season feed bridge is
+    # this many days/mouth instead of feed_hold; the freed surplus sells through the NORMAL
+    # reserve-floor path (1.1 x $25 = $27.5 -- never the $2.9 crater) and the
+    # BUY_PRODUCT WHEAT fallback re-buys if the shed runs dry before the next harvest. The
+    # 1-day-per-mouth shepherd floor (third hold site) stays regardless. 0 = byte-identical.
+    wheat_drip=6,           # 0925n D6: midfield 3-1 +11,055, elite -37,057 best-ever; the winners' cadence
     # Animals bought AND structures built per dawn (2026-09-19, ladder 110874286: the
     # winner ran ~22 animals against our 2-4). Hardcoded 1/1 means a 20-herd takes 20+
     # dawns to assemble in a 30-day season -- by the time the herd exists there are no
@@ -643,6 +1056,12 @@ _ONE_TIME = {c for c in CROPS if OBJECT_TABLE[c]["kind"] == "one_time"}
 # market the turn after it was bought -- a round trip that loses the spread and, worse, empties
 # the buffer the fertilize jobs are routed against.
 _INPUTS = {"FERTILIZER"}
+# 0925b P2 (crowd_premium_floor): the goods whose crash curves (linear/sq above-T
+# targets) make a quarter-of-base valve dump the season's worst realized price.
+# MILK is included despite its drip -- the valve fires exactly when the drip is
+# overwhelmed, which is when its realized price is worst. MELON is excluded: it is
+# always_sell by measured verdict and never holds value through a trough.
+_PREMIUM_HOLD_GOODS = ("STRAWBERRY", "MILK", "WOOL")
 
 # Key under which feed grain is tracked in `_unit_ops`'s shared stock dict. Prefixed so it cannot
 # collide with the WHEAT *seed* count in the same dict.
@@ -813,6 +1232,10 @@ def fert_value(tile, day, prices, pipe=None):
 # jobs to fall off an over-subscribed day are the cheap ones.
 
 TIER_RESCUE, TIER_HARVEST, TIER_FERT, TIER_GROW, TIER_PLANT, TIER_DIG = 50, 40, 35, 30, 20, 10
+# grind 0922b F4: raising DIG to 28 was MEASURED elite-toxic (skeleton seat-1 $52.0k ->
+# $26.8k) and byte-inert on the Majkel judges. The d18-25 default-arm weed backlog is real
+# (weeds 7 -> 35, live 67 -> 37) but its binding constraint is stream CAPACITY, not tier
+# order. `weed_tier` is kept as a dormant knob for the P5 tuner; 10 = legacy.
 
 
 def crop_value(crop, prices):
@@ -820,6 +1243,36 @@ def crop_value(crop, prices):
     plan = CROP_PLAN.get(crop)
     units = plan["units"] if plan else 1
     return units * prices.get(crop, _base(crop) if crop in MARKET_PARAMS else 0)
+
+
+def _marginal_hold(good, n, mi_now, tiles, unlocked, shed, day, horizon, unlocked_shops=None):
+    """0925b P4: should the first `n` units of the pile wait for a better book?
+
+    Prices the prefix against the head it would meet at the END of a `horizon`-day
+    sell window: future_head = now_head + horizon x (own committed pipeline per cycle,
+    spread over the window - exact town drain). The above-I0 curve is monotone
+    decreasing in inventory, so the mean over the prefix is the decision variable:
+    future mean >= now mean -> the book RISES toward the sale -> hold (return True);
+    otherwise sell through. On a flat book the two means are equal -> sell (the
+    static floor's answer), so the armed form is a strict generalization.
+
+    `mi_now` is the head the pile already walked to (post-static-floor). `tiles` is
+    read through `pipeline_units` -- a default-{} caller (unit tests, price-table
+    math) sees no pipeline; the live site passes the observation's tile grid.
+    """
+    if n <= 0 or mi_now >= I0:
+        return False
+    d = drain_per_day_from_shops(good, unlocked_shops if unlocked_shops is not None
+                                 else unlocked, day)
+    if d <= 0:
+        d = 1.0
+    cycle = max(1, crop_cycle_days(good)) if good in CROP_PLAN else 1
+    per_cycle = CROP_PLAN[good]["units"] if good in CROP_PLAN else 1
+    fut = mi_now + horizon * (per_cycle / cycle - d)
+    fut = min(I0, max(0, int(round(fut))))
+    fut_mean = sum(price_for(good, fut + k) for k in range(n)) / n
+    now_mean = sum(price_for(good, mi_now + k) for k in range(n)) / n
+    return fut_mean > now_mean
 
 
 def pipeline_units(tiles, unlocked, shed, crop):
@@ -898,6 +1351,50 @@ def horizon_head(crop, inv, pipe, shops, frac, day=0, floor_goods=(), floor_w=0.
     if floor_w > 0 and crop in floor_goods:
         drain = max(drain, expected_drain_per_day_horizon(crop, day, cyc) * cyc * frac * floor_w)
     return inv.get(crop, I0) + pipe - drain + (opp.get(crop, 0.0) * cyc if opp else 0.0)
+
+
+def opp_acreage_supply(opp_tiles, day, w):
+    """Opponent's FUTURE crop supply per good, from their public board (units/day-equiv).
+
+    The rival's farm is visible every turn: each standing PLANT tile carries `yield_units`
+    (cash now, whenever they harvest) and `planted_day`, and ongoing crops (TOMATO,
+    STRAWBERRY) have scheduled productions still to fire after their standing units.
+    Standing units are priced as arriving over the next `harvest_day` days (their own
+    drip cadence), future productions as arriving over the rest of the season. The total
+    for a good, divided by a horizon, is the per-day-equivalent rate `horizon_head`'s
+    `opp` term expects (positive = they add). Returns {} when the weight is 0 -- inert by
+    construction, and `day`-safe at the episode start (their planted_day >= our day is
+    treated as 0 age).
+
+    This is the FORWARD complement to the monitor's backward residual: the acreage
+    predicts their d25-29 endgame wave while it is still seedlings, which is exactly the
+    information a d13-19 planting decision needs.
+    """
+    if not w or not opp_tiles:
+        return {}
+    per = {}
+    for _row in opp_tiles:
+        for t in (_row or []):
+            if not isinstance(t, dict) or t.get("kind") != "PLANT":
+                continue
+            crop = t.get("crop")
+            plan = CROP_PLAN.get(crop)
+            if not plan or crop not in MARKET_PARAMS:
+                continue
+            units = int(t.get("yield_units") or 0)
+            age = max(0, day - int(t.get("planted_day") or 0))
+            hd = plan["harvest_day"]
+            if t.get("max_lifespan_step", -1) < 0:
+                # ongoing: sched productions still to fire beyond the standing units.
+                sched = (4 if crop == "TOMATO" else 4)   # both ongoing crops cap at 4 events
+                fired = age // (2 if crop == "STRAWBERRY" else 1)
+                remain = max(0, min(sched, fired + 1) - 1) if units else sched
+                future = remain * plan["units"]
+            else:
+                future = 0                                # one-time: standing units are all
+            horizon = max(1.0, float(min(SEASON_DAYS - day, hd) or hd))
+            per[crop] = per.get(crop, 0.0) + (units + future) / horizon
+    return {g: v * w for g, v in per.items()}
 
 
 def effective_prices(tiles, unlocked, shed, inv, prices, shops=(), frac=0.0, cap=0.0,
@@ -1029,6 +1526,20 @@ def collect_jobs(tiles, unlocked, day, prices, want, avail, params, fert_stock=0
             crop = tile.get("crop")
             val = crop_value(crop, prices)
             hp = harvest_plan(tile, day)
+            # ELO-first B1 (decay_urge): a past-lifespan tile is bleeding 1 unit per 2
+            # turns -- by tomorrow morning this value is 12 units lighter (spec: post-max
+            # decay "-1 every other turn until 0"). Price the job at units PER TURN, not
+            # standing units, and escalate it into TIER_RESCUE: skipping it for one day
+            # forfeits the whole standing crop, the same forfeiture logic that already
+            # puts thirst-rescue at tier 50. Units still standing beat units on paper.
+            if params.get("decay_urge", 0) and hp and decay_clock_running(crop, tile_age(tile, day)):
+                op, then = hp
+                u_now = tile.get("yield_units", 0)
+                jobs.append(dict(pos=(x, y), op=op, then=then,
+                                 acts=2 if then else 1,
+                                 tier=TIER_RESCUE,
+                                 value=u_now * prices.get(crop, _base(crop)), crop=crop))
+                continue
             if hp:
                 op, then = hp
                 units = tile.get("yield_units", 1)
@@ -1081,6 +1592,36 @@ def collect_jobs(tiles, unlocked, day, prices, want, avail, params, fert_stock=0
     # fix the placement job RUNS from a shed-access tile (PICKUP needs one), so "farthest from
     # the shed" now costs a real commute on every placement -- but animals are 2-3 tiles a
     # season against ~90 plantings, and the tile-quality term still dominates.
+    # Shed-ring reservation (grind 0921 b): while the herd still has structures left
+    # to place, animal structures get FIRST CLAIM on the tiles hugging the shed-access
+    # ring (Manhattan <= 2 from any access tile, access tiles themselves excluded) and
+    # the crop allocator is filtered out of them. The judge-900 autopsy measured the
+    # race this fixes: our pastures sat at avg walk 3.9-4.0 ( Majkel's: 1.6-1.8 )
+    # because the 46-tile seed round claims the whole near ring on d0, days before the
+    # first BUILD job fires -- so 7 of our animals cost 83-92 service turns vs a
+    # 6x12=72 capacity and the (correct) co-feasibility gate then vetoed every buy
+    # d14-d22 with $12k idling. Recurring chores dominate one-cycle crops, so the ring
+    # goes to the herd; the reservation releases (need_more <= 0) once the herd is
+    # housed, and endgame already lifts it via `shepherd_near`.
+    reserve = set()
+    shepherd_near = bool(params["shepherd_mode"]) \
+        and day < SEASON_DAYS - params["endgame_days"]
+    if animals and shepherd_near:
+        sheds0 = set(SHED_TILES.values())
+        want_herd = int((animals.get("gates") or {}).get("want") or 0)
+        if not want_herd:
+            want_herd = (int(params.get("herd_cow", 0) or 0)
+                         + int(params.get("herd_sheep", 0) or 0)
+                         + int(params.get("herd_goose", 0) or 0))
+        need_more = want_herd - (int(animals.get("built", 0) or 0)
+                                 + int(animals.get("live", 0) or 0))
+        if want_herd > 0 and need_more > 0:
+            ring = [p for p in empties
+                    if p not in sheds0
+                    and min(manhattan(p, st) for st in sheds0) <= 2]
+            ring.sort(key=lambda p: (min(manhattan(p, st) for st in sheds0), p))
+            reserve = set(ring[:need_more + 2])
+
     if animals and animals.get("n_build", 0) > 0:
         struct = "BUILD_COOP" if animals["struct"] == "COOP" else "BUILD_PASTURE"
         sheds = set(SHED_TILES.values())
@@ -1090,8 +1631,6 @@ def collect_jobs(tiles, unlocked, day, prices, want, avail, params, fert_stock=0
         # so clustering cuts the per-loop overhead from dozens of turns to single digits.
         # The spawn guarantee is unchanged: the four shed-access tiles stay off-limits
         # (the `spot in sheds` skip below), so hands still deploy cleanly.
-        shepherd_near = bool(params["shepherd_mode"]) \
-            and day < SEASON_DAYS - params["endgame_days"]
         while built < animals["n_build"] and len(empties) > ei:
             # Never on a shed tile. The engine treats those as ordinary empty ground, but PLACE
             # checks for a structure before it checks for the shed, so a pasture on (4,4) would
@@ -1106,19 +1645,23 @@ def collect_jobs(tiles, unlocked, day, prices, want, avail, params, fert_stock=0
             jobs.append(dict(pos=spot, op=[struct], tier=TIER_PLANT,
                              value=animals["rank"]))
             built += 1
+    # Crops never see the reserve (grind 0921 b): the cursor walks a filtered pool so
+    # a planting on the same call cannot eat the tiles the herd still needs.
+    crop_pool = [p for p in empties[ei:] if p not in reserve]
+    ci = 0
     for crop in order:
         if not in_time(crop, day):
             continue
-        n = min(want[crop], avail.get(crop, 0), len(empties) - ei)
+        n = min(want[crop], avail.get(crop, 0), len(crop_pool) - ci)
         for _ in range(max(0, n)):
             # PLANT and the first WATER are one job, not two. The engine plants with
             # `consecutive_unwatered = 1`, so a tile planted today and left dry tonight hits 2
             # at midnight and turns to weed -- the seed, the turn and the whole cycle gone.
             # Splitting them risks the routing handing the WATER to a different unit, or to a
             # later slice of the day that the turn budget then drops.
-            jobs.append(dict(pos=empties[ei], op=["PLANT", crop], then=["WATER"], acts=2,
+            jobs.append(dict(pos=crop_pool[ci], op=["PLANT", crop], then=["WATER"], acts=2,
                              tier=TIER_PLANT, value=plant_rank(crop, prices), crop=crop))
-            ei += 1
+            ci += 1
 
     jobs.sort(key=lambda j: (-j["tier"], -j["value"]))
     return jobs
@@ -1437,7 +1980,7 @@ def shepherd_chores(tile, day, endgame, care=True):
 
 
 def shepherd_loops(struct_tiles, day, unlocked, n_units=1, bag_cap=24, care=True,
-                   balance=False):
+                   balance=False, commute=None):
     """Computed chore loops for the shepherd stream, plus their priced turn budget.
 
     `struct_tiles` is [(x, y, tile_dict)] over every LIVE structure. Returns
@@ -1484,18 +2027,30 @@ def shepherd_loops(struct_tiles, day, unlocked, n_units=1, bag_cap=24, care=True
         # leg as its own distance-to-shed, so a chained cluster's real walk cost (item to
         # item to ... to shed) is under-counted and the "fits" cluster really costs up to
         # 2x the shepherd's day -- the executor then cuts its tail (cares first) and the
-        # exact gate reads the overload and freezes growth. Dealing the items round-robin
-        # (snake order: nearest, farthest, nearest...) gives near-equal loops that each
-        # fit the day, so every animal's FEED and CARE actually executes.
+        # exact gate reads the overload and freezes growth. LPT deal (grind 0921 c):
+        # costliest item first into the currently-lightest cluster. The old snake deal
+        # put the FARTHEST item into cluster 0 (nearest + farthest ~= 20 turns) while
+        # four single clusters sat at 7 -- the max-based care test read the one fat
+        # loop and vetoed buys with four shepherds idling. LPT bounds the max cluster
+        # at roughly twice the mean, which is what the gate actually tests.
         clusters = [[] for _ in range(min(n_units, len(items)))]
-        ordered = sorted(left, key=lambda it: manhattan(it[0], sheds[0]))
-        for i, it in enumerate(ordered):
-            k = i % len(clusters)
-            if i // len(clusters) % 2 == 1:
-                k = len(clusters) - 1 - k
+        load = [0] * len(clusters)
+
+        def _item_cost(it):
+            return manhattan(it[0], nearest_shed(it[0], unlocked)) + len(it[1])
+
+        for it in sorted(left, key=_item_cost, reverse=True):
+            k = min(range(len(clusters)), key=lambda i: load[i])
             clusters[k].append(it)
+            load[k] += _item_cost(it) + 2   # +2: the inter-leg walk the item adds
         left = []
-    per_unit_day = 2 * capacity(3.0 + 1.5 * max(0, len(unlocked) - 1))
+    # Shed-anchored commute (grind 0921 d): shepherd loops START at a shed-access tile
+    # (loop[0] is a PICKUP there), so their walk does NOT grow with the unlocked area
+    # the way a crop serpentine's does. Callers pass the ring commute explicitly; the
+    # default keeps the legacy area-scaled term for non-elite callers.
+    if commute is None:
+        commute = 3.0 + 1.5 * max(0, len(unlocked) - 1)
+    per_unit_day = 2 * capacity(commute)
     for seed in sheds:
         if not left:
             break
@@ -1564,6 +2119,103 @@ def shepherd_loops(struct_tiles, day, unlocked, n_units=1, bag_cap=24, care=True
             budget += manhattan(pos, loop[-1]["pos"]) + 1
         loops.append(loop)
         loop_costs.append(budget - sum(loop_costs))   # this loop's own share of the total
+    return loops, budget, loop_costs
+
+
+def wheel_plan(struct_tiles, day, unlocked, n_units=1, care=True):
+    """REBUILT SERVICE SCHEDULER (0924i): shed-anchored per-animal trips, chain-free.
+
+    Why the chain shape had to go (measured, judge 886 herd-12 arm): at herd 11 the
+    chain stream costs 107 budget against a 110-turn day -- 97% utilisation, ~79% of
+    it WALKING (22 ops, ~85 walk turns). The chain binds feed-to-feed, so one tail
+    cut loses 2-3 animals' feeds at once (consecutive_unfed 1 -> escape next day),
+    and the projected stream cost is what vetoes every buy past herd 7-8. The chain's
+    only advantage is bulk PICKUP amortization -- which is worthless at ring distance
+    (d_shed 1-2) where our reserve ring places the herd: a d=1 animal's wheel trip is
+    walk-in + feed + walk-home = 3 turns vs the chain's 5.9/animal amortized; Majkel
+    at his measured 1.6-1.8 ring pays ~7.2/animal for 22-wheel ops with ZERO chain
+    coupling. An overloaded wheel day sacrifices ONE animal's care tail; the chain's
+    sacrifices a life.
+
+    A wheel trip = PICKUP WHEAT 1 at the nearest shed, walk in, FEED, piggyback
+    CARE / COLLECT_FERTILIZER / HARVEST (state-guarded, same as chain), walk home,
+    DROP. Trips are assigned to shepherds round-robin over a nearest-neighbor tour
+    seeded by the access tiles (simple, deterministic, index-parity with n_units);
+    an overloaded day cuts the queue's TAIL -- whole trips at the end -- and because
+    every carrying trip ENDS with a home-DROP leg, whatever produced before the cut
+    is banked (engine: hands dumped at midnight, so a dropped tail loses the carry --
+    the chain pre-loads against exactly this; here it is structural).
+
+    Returns the same contract as shepherd_loops: (loops, budget, loop_costs).
+    """
+    if n_units <= 0:
+        return [], 0, []
+    endgame = day >= SEASON_DAYS - 1
+    items = []
+    for (x, y), tile in struct_tiles:
+        ops = shepherd_chores(tile, day, endgame, care=care)
+        if ops:
+            items.append(((x, y), ops))
+    if not items:
+        return [], 0, []
+
+    # -- trip legs: one PICKUP + chores per animal, chain-free. Trips that CARRY
+    # (HARVEST or COLLECT in the op set -> the bag is non-empty at the end; a FEED
+    # nets zero: the PICKUP's 1 wheat goes straight into the animal) close with an
+    # explicit home-DROP leg so produce is saleable the same day (SELL reads the
+    # SHED, and the engine's midnight auto-dump only preserves the bag -- it cannot
+    # sell it). Carry-free trips skip the DROP: the engine drops an empty bag for
+    # free and the turn is saved.
+    trips = []
+    for (pos, ops) in items:
+        legs = [dict(pos=nearest_shed(pos, unlocked), op=["PICKUP", "WHEAT", 1],
+                     stock_key=_FEED, acts=1, is_loop=True)]
+        at = pos
+        for op in ops:
+            legs.append(dict(pos=at, op=[op], acts=1, is_loop=True))
+        n = len(legs)
+        for k, leg in enumerate(legs):
+            if k > 0:
+                leg["carried"] = True
+        if any(op in ("HARVEST", "COLLECT_FERTILIZER") for op in ops):
+            legs.append(dict(pos=nearest_shed(pos, unlocked), op=["DROP"],
+                             acts=1, is_loop=True))
+            legs[-1]["carried"] = True
+        trips.append((legs, manhattan(nearest_shed(pos, unlocked), pos) * 2
+                      + len(ops)))
+    # -- assign trips to shepherds: nearest-neighbor tour, seeded round-robin over
+    # the access tiles (the chain's parallel-seed guarantee, trip-granular now).
+    sheds = [p for q, p in SHED_TILES.items() if q in unlocked] or [SHED_TILES["NW"]]
+    extra = [p for q, p in SHED_TILES.items() if q not in unlocked]
+    seeds_t = (sheds + extra)
+    order = []
+    left = list(range(len(trips)))
+    while left:
+        k = len(order) % max(1, len(seeds_t))
+        seed = seeds_t[k]
+        i = min(left, key=lambda j: manhattan(trips[j][0][0]["pos"], seed))
+        left.remove(i)
+        order.append(i)
+    buckets = [[] for _ in range(n_units)]
+    for oi, i in enumerate(order):
+        buckets[oi % n_units].append(trips[i])
+    loops, budget, loop_costs = [], 0, []
+    for k in range(n_units):
+        if not buckets[k]:
+            loops.append([])  # keep index parity with n_units for the gate's max()
+            loop_costs.append(0)
+            continue
+        loop = []
+        b = 0
+        pos = seeds_t[k % len(seeds_t)]
+        for legs, _c in buckets[k]:
+            for leg in legs:
+                b += manhattan(pos, leg["pos"]) + 1
+                loop.append(dict(leg))
+                pos = leg["pos"]
+        loops.append(loop)
+        loop_costs.append(b)
+        budget += b
     return loops, budget, loop_costs
 
 
@@ -1877,9 +2529,30 @@ class Policy:
         self.p = dict(PARAMS)
         if params:
             self.p.update(params)
+        # 0925f flock_arm: arm the built led_flock funded opening on the default arm
+        # (one switch at construction; PARAMS itself stays byte-identical so tests
+        # and probes that pin the shipped defaults keep passing).
+        if self.p.get("flock_arm", 0) and not self.p["elite_script"] \
+                and not self.p["opening_led"]:
+            self.p["led_flock"] = True
+        # 0925i milk_first_wave: the minimal d0 cow (see PARAMS). Uses the built
+        # opening_led stage-1 emission with an EMPTY stage 2 -- one cow + grain, the
+        # reserve nets ~$550, everything else byte-identical shipped behavior.
+        if self.p.get("milk_first_wave", 0) and not self.p["elite_script"] \
+                and not self.p["flock_arm"]:
+            self.p["opening_led"] = True
+            self.p["led_cow0"] = 1
+            self.p["led_wheat0"] = 2
+            self.p["led_cow2"] = 0
+            self.p["led_sheep0"] = 0
+            self.p["led_hire2"] = 0
+        # 0925f wave_share_animal: settled windfall tracker (dawn-to-dawn bank delta).
+        self._wave_prev_bank = None
+        self.wave_cash = 0.0
         self.queues = {}
         self.plan_day = -1
         self.plan_cut_for = 0     # unit count the live route plan was cut for; see `_act`
+        self._idle_recut_day = -1  # once-per-day cap on the idle residual re-cut (0924h)
         self.want = {}
         self.seed_plan = {}
         self.eff = {}             # pipeline-adjusted crop prices, recomputed each dawn
@@ -1890,6 +2563,7 @@ class Policy:
         self.limit = ""           # which resource ended the dawn allocation; probes only
         self.fert_have = 0        # doses the dawn plan may route, shed stock plus today's buy
         self.animals = None       # livestock plan for the day; None means the programme is off
+        self.shepherd_pins = None  # day-pinned shepherd unit ids + assignment state; see _replan
         # One-shot market orders already issued today. `_market_orders` runs every turn against a
         # plan that is only recomputed at dawn, so anything sized from that plan has to record
         # that it went out or it goes out 24 times.
@@ -1898,12 +2572,29 @@ class Policy:
         # supply (see PARAMS.monitor), updated from the public book every turn.
         self.mkt = _MarketMonitor(self.p) if self.p.get("monitor") else None
         self.opp = {}             # per-crop opponent net supply, from the monitor
+        self.opp_census = {"COW": 0, "SHEEP": 0, "GOOSE": 0}  # rival public herd (P3 milk window)
+        self.px_peak = {}         # good -> best book price seen this season (window roll-off)
+        # ELO-first C (endgame_shift): the effective full-clear start day. None = shipped
+        # form; an int = the public-money read fired and the floors come off a day early.
+        # Also the pooled-episode guard: `_market_orders` re-None's it at day<=1 of every
+        # new episode so a shared process cannot inherit the last game's fired shift.
+        self.eff_endgame = None
         # Set by `_sell_orders` each turn, read by `_market_orders` in the same turn.
         self.crowded = False
         self.pressure = 0.0
         # A full roster costs $143 for the day against $80 for one melon seed, so wages are
         # simply held out of the seed budget rather than traded off against it.
-        self.wage_reserve = sum(fib_hire_cost(i) for i in range(self.p["max_hands"]))
+        # wage_reserve_window (grind 0924d): the legacy reserve prices hiring the ENTIRE
+        # roster in one day (cumulative fib to max_hands: $143 at 11, $986 at 14, $2,583
+        # at 16 -- the 16 mirror collapse was the seed round gutted by the reserve, the
+        # d0-gutting signature again). Hires are demand-sized and SPREAD across dawns at
+        # ~$1-5/day (hires_today resets daily; hands persist -- engine-exact), so the
+        # honest reserve prices only a few hires ahead. 0 = legacy full-cap sum.
+        _w = int(self.p.get("wage_reserve_window", 0) or 0)
+        if _w > 0:
+            self.wage_reserve = sum(fib_hire_cost(i) for i in range(_w))
+        else:
+            self.wage_reserve = sum(fib_hire_cost(i) for i in range(self.p["max_hands"]))
         self.last_error = None
         # engine fingerprint state (inert while PARAMS.force_engine == "pin")
         self.engine = None            # verdict once detection has run
@@ -2004,6 +2695,14 @@ class Policy:
             self.plan_day = day
             self.plan_cut_for = len(units)
             self.ordered = {}
+            # 0925f wave_share_animal: the settled windfall = dawn-to-dawn bank delta,
+            # clamped at >= 0 (a heavy land/seed dawn is a SPEND, not negative income).
+            # Read by `_animal_plan` the same dawn to fund continuous herd expansion.
+            if self.p.get("wave_share_animal", 0) > 0:
+                _bank = me.get("money", 0.0)
+                if self._wave_prev_bank is not None:
+                    self.wave_cash = max(0.0, _bank - self._wave_prev_bank)
+                self._wave_prev_bank = _bank
             # Plant against the price the harvest will meet, not the price on the board today.
             # See `effective_prices`: melon's own volume is what sets melon's price, and the
             # town's drain over the growing period is what sets everything else's.
@@ -2014,6 +2713,25 @@ class Policy:
             if self.mkt is not None:
                 self.mkt.dawn()
                 self.opp = self.mkt.opp_supply()
+            # 0925i wave-cap: merge the FORWARD opponent-supply read (public acreage ->
+            # their future wave) into the same `opp` plumbing. Both sources are per-day
+            # equivalents; the acreage term dominates in the planting window because it
+            # sees d25-29 from d13. Inert at opp_acreage_credit=0 (returns {}). The
+            # opponent farm read is wrapped: an analysis harness without a rival keeps
+            # the empty dict.
+            _w_ac = self.p.get("opp_acreage_credit", 0) or 0
+            if _w_ac:
+                try:
+                    _fo = (obs.get("farms") or [])
+                    _opp_f = (_fo[(1 - obs.get("player", 0)) % len(_fo)]
+                              if len(_fo) > 1 else None)
+                    _ac = opp_acreage_supply((_opp_f or {}).get("tiles") or [],
+                                             day, float(_w_ac))
+                    if _ac:
+                        for _g, _v in _ac.items():
+                            self.opp[_g] = self.opp.get(_g, 0.0) + _v
+                except Exception:
+                    pass
             self.eff = effective_prices(tiles, unlocked, shed, inv, prices, self.shops,
                                         self.p["drain_frac"], self.p["px_cap"], day,
                                         self.p["drain_floor_goods"], self.p["drain_floor"],
@@ -2050,6 +2768,63 @@ class Policy:
             # and since the seed order is sized off those jobs, deleting them stops the seed from
             # ever being bought.
             self._replan(tiles, unlocked, day, hour, self.eff, self.seed_plan, units, t0)
+        elif (self.p.get("idle_recut", 0) and hour > 8
+              and hour < TURNS_PER_DAY - 2 and self.queues
+              and self._idle_recut_day != day):
+            # Surgical idle-residual cut (0924h seam 1). The pass-probe (mirror seed 2):
+            # 510 PASS events, ALL with actionable work on the board (mean 26.1 waterable),
+            # exploding h20-23: the dawn cut drops the day's tail, lanes drain by evening,
+            # and work_steal only sees jobs sitting in OTHER units' queues -- the tail is
+            # in nobody's queue. Three measured failure modes shaped this form (all
+            # same-session, mirror seeds 0-4):
+            #   lane_keep semantics:   $17.3k mean  (shepherd loops DELETED -- standing
+            #                          excludes shepherds then writes back as whole plan)
+            #   raw whole-board recut: $18.9k mean  (feed chains skipped under the stream,
+            #                          drained shepherd lanes become crop lanes, herd starves)
+            #   >=2-idle recut+restore: $61.3k mean-flat, variance explosive (s2 +$17.4k
+            #                          to $79.9k -- highest mirror bank ever -- s3/s4 -$14/-18k;
+            #                          mid-drain recuts disturb partially-loaded lanes)
+            #   drained-crop-lanes:    byte-identical (>=1 crop lane always holds work
+            #                          until midnight; shepherds never drain, full-drain
+            #                          never fires)
+            # Final form: NO recut. Cut the unqueued residual DIRECTLY among idle units
+            # (nearest-first, deduped against every standing queue); busy lanes -- shepherd
+            # loops included -- are never read, never rebuilt, never touched. Zero churn,
+            # zero chore loss, by construction. One cut per day.
+            pins = getattr(self, "shepherd_pins", None)
+            shepherds = {i for i in (pins.get("ids") if pins else ())
+                         if i in self.queues}
+            idle = [i for i, q in self.queues.items() if not q and i not in shepherds]
+            if len(idle) >= 2:
+                self._idle_recut_day = day
+                taken = set()
+                for q in self.queues.values():
+                    for j in q:
+                        taken.add((j["pos"], j["op"][0],
+                                   j["op"][1] if len(j["op"]) > 1 else None))
+                jobs_now = collect_jobs(tiles, unlocked, day, self.eff, self.want,
+                                        self.seed_plan, self.p,
+                                        fert_stock=self.fert_have,
+                                        animals=self.animals)
+                residual = [j for j in jobs_now
+                            if (j["pos"], j["op"][0],
+                                j["op"][1] if len(j["op"]) > 1 else None) not in taken
+                            and self._valid(j, tiles, day, None, hour)]
+                if residual:
+                    pos_of = dict(units)
+                    idle.sort(key=lambda i: 0)  # stable; assignment below is greedy
+                    for j in sorted(residual, key=lambda j: serpentine_key(j["pos"])):
+                        free = [i for i in idle if i in pos_of]
+                        if not free:
+                            break
+                        tx, ty = j["pos"]
+                        ui = min(free, key=lambda i: abs(pos_of[i][0] - tx)
+                                 + abs(pos_of[i][1] - ty))
+                        self.queues[ui] = self.queues.get(ui) or []
+                        self.queues[ui].append(dict(j))
+                        pos_of[ui] = (tx, ty)
+                        if len(self.queues[ui]) >= 4:
+                            idle.remove(ui)
 
         if self._book_use:
             served = self._book_serve(obs, day, hour, len(units))
@@ -2109,6 +2884,12 @@ class Policy:
         total = sum(mix.values()) or 1
         live, empty = self._board_state(tiles, unlocked)
         budget = max(0.0, money - self.wage_reserve)
+        # opening_float (majkel_skeleton): d0-2 liquidity floor. Seeds may not spend the
+        # float -- the census bank keeps ~$1.3k unspent until the first wool pop, because
+        # a broke farm cannot hire the hands that feed the herd whose wool funds the season.
+        fl = self.p.get("opening_float", 0)
+        if fl and day <= 2:
+            budget = max(0.0, min(budget, money - fl))
         # The windfall cap (see PARAMS): the seed budget may not spend the whole bank, because
         # the board it buys has to be watered by a roster whose wages do not pause for the
         # yield gap. Half a day of wages plus `windfall_reserve` more stays out of reach on
@@ -2120,6 +2901,17 @@ class Policy:
         if self.p["windfall_pct"] < 1.0 and len(unlocked) > 1:
             keep = self.wage_reserve * (0.5 + max(0, self.p["windfall_reserve"]))
             budget = min(budget, keep + self.p["windfall_pct"] * max(0.0, money))
+        # -- opening seed budget cap (majkel_skeleton, smoke seed 0). The census opening
+        # keeps ~$800 floating after the t1-t2 animal bundle: his strawberry/wheat mix
+        # ACCUMULATES over the season on wool cash, it is not front-loaded on dawn 0. Our
+        # full mix at d0 spent the bank to $2 by d1 -- no cash for the first HIRE (fib $1
+        # still needs a solvent bank), zero hands, zero structures, animals never placed,
+        # and 22 straight days of $0 income: the poverty spiral wearing a new mask.
+        # Inside the script window the seed round is capped so hire + bridge money
+        # survives the day-0 round; from d2 the standard net-of-wages budget returns.
+        so = self.p.get("seed_opening_cap", 0)
+        if so and day == 0:
+            budget = min(budget, so)
         land = 25 * max(1, len(unlocked))
         cap = {c: self.p["mix_cap"] * mix[c] / total * land for c in mix}
         # Day-0 melon cohort cap (see PARAMS `melon_opening`). Ladder 0-4 batch: with the
@@ -2135,7 +2927,8 @@ class Policy:
         # (turns_per_day x feed_days) tiles, enforced as a floor on WHEAT's cap in the
         # marginal allocation. The 173-seed elite number is an OUTCOME of feed coverage,
         # not a target; the coverage math is the policy.
-        if self.p["elite_script"] and self.p["feed_backbone"]:
+        if ((self.p["elite_script"] or self.p.get("led_flock", False))
+                and self.p["feed_backbone"]):
             mouths_n = ((self.animals.get("live", 0) + self.animals.get("held", 0)
                          + self.animals.get("n_buy", 0) + self.animals.get("n_build", 0))
                         if self.animals else 0)
@@ -2148,6 +2941,17 @@ class Policy:
                 mouths_n = max(mouths_n, script_herd)
             # A tile yields ~4 units/cycle (~1 unit/tile-day over its 4-day cycle +
             # replant), so a mouth needs ~1.5 tiles standing: 5 mouths = 8 tiles.
+            wheat_floor = -(-mouths_n * 3 // 2)
+            if wheat_floor and "WHEAT" in cap:
+                cap["WHEAT"] = max(cap["WHEAT"], wheat_floor)
+        elif (self.p.get("feed_backbone_def", False) and self.p["feed_backbone"]
+                and not self.p["elite_script"] and self.p["shepherd_mode"]):
+            # B4 (ship 0922): the backbone serves ANY herd, not just the elite script's.
+            # At the dossier herd (~16 mouths) the default arm's d22-25 grain-death
+            # returns at triple scale; `feed_backbone_def` lets the panel decide.
+            mouths_n = ((self.animals.get("live", 0) + self.animals.get("held", 0)
+                         + self.animals.get("n_buy", 0) + self.animals.get("n_build", 0))
+                        if self.animals else 0)
             wheat_floor = -(-mouths_n * 3 // 2)
             if wheat_floor and "WHEAT" in cap:
                 cap["WHEAT"] = max(cap["WHEAT"], wheat_floor)
@@ -2176,14 +2980,16 @@ class Policy:
         if self.animals:
             load += self.p["animal_load"] * max(self.animals["live"], self.animals["built"])
         want, plan, spent = {}, {}, 0.0
-
         # -- MANDATORY backbone allocation (elite, smoke-caught): a cap alone did nothing
         # -- the marginal loop still ranked melon above wheat, the seed round bought 4
         # melons and zero wheat, the field never fed, and the whole d0 herd escaped at
         # d8-9 with grain $0 in the shed. Feed is infrastructure: the wheat tiles are
         # allocated FIRST, ahead of the marginal contest, whenever a herd stands or is
         # on order.
-        if self.p["elite_script"] and self.p["feed_backbone"] and wheat_floor > 0 \
+        if (self.p["elite_script"] or self.p.get("led_flock", False)
+                or (self.p.get("feed_backbone_def", False)
+                    and not self.p["elite_script"])) \
+                and self.p["feed_backbone"] and wheat_floor > 0 \
                 and "WHEAT" in cap:
             n_w = min(wheat_floor - live.get("WHEAT", 0), cap["WHEAT"], empty)
             cost = OBJECT_TABLE["WHEAT"]["seed_cost"]
@@ -2253,6 +3059,15 @@ class Policy:
         # cash and profitable crops, another quadrant converts cash into acreage at once. If it
         # ran out of cash or of crops worth planting, a quadrant is $1,000 of nothing.
         self.tile_limited = (empty <= 0)
+        # land_early (majkel_skeleton): the census has elites buying the next quadrant at
+        # t78-150 (d4-6) while our gate waits for a FULL quadrant -- about a week later.
+        # Majkel's land arrives right after the first wool/melon cash: acreage is what his
+        # strawberry board and herd structures stand on. Relaxing to "allocator nearly
+        # exhausted the quadrant with cash still ample" keeps the measured spirit (do not
+        # buy tiles nothing will plant) while closing the week-long lag. The `land_margin`
+        # cash gate below is unchanged.
+        if self.p.get("land_early") and day >= 4 and empty <= 6:
+            self.tile_limited = True
         # The same question with more resolution, for `analysis/limit_probe.py`: "tiles" means
         # the board is full, anything else names the resource that ran out first. Read by probes
         # only -- nothing in the policy branches on it -- so it can change shape freely.
@@ -2289,6 +3104,17 @@ class Policy:
         # to veto mid-season expansion when the cash has no better use.
         elite_margin = self.p["animal_margin"]
         if (self.p["elite_script"]
+                and money >= self.p["expansion_cash"] * max(
+                    OBJECT_TABLE[sp]["buy_cost"] for sp in ("COW", "SHEEP", "GOOSE"))):
+            elite_margin = 0.0
+        # s1223 (luanhe autopsy): the DEFAULT arm never opens the margin gate --
+        # the elite bypass above is `elite_script`-gated, so with the incumbent
+        # prices crashed in-mirror the d11 wave-funded reinvest is vetoed forever
+        # (animals bought 11 vs judge 9-38, the same mid-game freeze every failed
+        # herd arm died of). `margin_open` lets the default arm use the same rule:
+        # once the bank holds `expansion_cash` animal-costs, the margin gate opens.
+        # Dormant by default; --params A/B decides adoption.
+        if (self.p.get("margin_open", False) and not self.p["elite_script"]
                 and money >= self.p["expansion_cash"] * max(
                     OBJECT_TABLE[sp]["buy_cost"] for sp in ("COW", "SHEEP", "GOOSE"))):
             elite_margin = 0.0
@@ -2343,8 +3169,9 @@ class Policy:
         # order per species. The envelope (herd_cow/herd_sheep/herd_goose) is a search
         # space, not a quota: expansion stops when the marginal rank is not worth it.
         per_species_want = None
-        if self.p["elite_script"]:
-            env = {"COW": self.p["herd_cow"], "SHEEP": self.p["herd_sheep"],
+        if self.p["elite_script"] or self.p["wool_lane"] > 0:
+            env = {"COW": self.p["herd_cow"],
+                   "SHEEP": max(self.p["herd_sheep"], self.p["wool_lane"]),
                    "GOOSE": self.p["herd_goose"]}
             counts, incumbent_by_species = {"COW": 0, "SHEEP": 0, "GOOSE": 0}, {}
             for y2 in range(BOARD_SIZE):
@@ -2368,6 +3195,50 @@ class Policy:
                 r, prog = ranks.get(sp, (0.0, None))
                 if prog is not None and r > sp_r:
                     sp_best, sp_r = sp, r
+            # Wool-lane seeding (grind 0922). The marginal pick alone never opens the
+            # second lane: the first gate-open dawn's rank winner then wins every dawn
+            # after it, so the judges grew ALL-COW herds (886/907: 0u wool all season
+            # against a $174-218 seller's market the judge monetized for $11.9-13.1k).
+            # Until one sheep stands, the wool lane outranks the marginal pick -- one
+            # pace-sized order seeds it, then the normal marginal portfolio resumes.
+            if (self.p["wool_lane"] > 0 and counts.get("SHEEP", 0) == 0
+                    and ranks.get("SHEEP", (0.0, None))[1] is not None
+                    and ranks["SHEEP"][0] > elite_margin):
+                sp_best, sp_r = "SHEEP", ranks["SHEEP"][0]
+            # -- Opponent-conditional wool arbitrage (0924c). The 886/907 leaks measured
+            # it: the judge monetized wool for $11.9-13.1k while our all-cow herd sold 0u,
+            # and a cow-heavy rival (Majkel 14-16) crashes MILK for both herds while wool
+            # stays $174-218. When the rival is at glut scale, runs ~no sheep, and wool
+            # still trades strong, the unclaimed pot outranks the marginal pick: lift the
+            # sheep envelope and force the species until the lane stands. Every safety
+            # gate (care/stream co-feasibility, feed_solvency, per-species stop, wool
+            # hold/floor) stays in the path -- this only aims the portfolio, it does not
+            # bypass admission. Conditions dropping (rival builds sheep, wool collapses)
+            # release the lane back to the marginal portfolio.
+            if (self.p.get("opp_wool_prio", 0) and self.opp_census.get("COW", 0) >= self.p["opp_cow_glut"]
+                    and self.opp_census.get("SHEEP", 0) <= self.p.get("opp_sheep_max", 4)
+                    and prices.get("WOOL", _base("WOOL")) >= self.p["opp_wool_px"] * _base("WOOL")):
+                env["SHEEP"] = max(env.get("SHEEP", 0), int(self.p["opp_wool_env"]))
+                _sr, _sprog = ranks.get("SHEEP", (0.0, None))
+                if (counts.get("SHEEP", 0) < env["SHEEP"]
+                        and _sprog is not None and _sr > 0):
+                    sp_best, sp_r = "SHEEP", _sr
+            # -- Demand-gated EGG lane (0924h seam 2). GOOSE is priced by the same rank
+            # table, but herd_goose=0 means the portfolio never even looks at it; khan's
+            # tape shows a $21k EGG season is available when the draw has egg demand and
+            # the rival leaves the pot alone. Gate on the OBSERVABLE demand side, not a
+            # fixed day: egg shops unlocked (exact drain), EGG price holding, rival geese
+            # < 4. Falls back to the marginal pick if any condition drops.
+            if (self.p.get("egg_lane", 0)
+                    and drain_per_day_from_shops("EGG", self.shops, day) >= 6 * self.p["egg_lane_shops"]
+                    and prices.get("EGG", _base("EGG")) >= self.p["egg_lane_px"] * _base("EGG")
+                    and self.opp_census.get("GOOSE", 0) < 4):
+                env["GOOSE"] = max(env.get("GOOSE", 0), int(self.p["egg_lane"]))
+                _gr, _gprog = ranks.get("GOOSE", (0.0, None))
+                if (counts.get("GOOSE", 0) < env["GOOSE"]
+                        and _gprog is not None and _gr > 0
+                        and _gr > sp_r):
+                    sp_best, sp_r = "GOOSE", _gr
             if sp_best is not None:
                 # The portfolio's species becomes the plan's species for TODAY's buy/build:
                 # `best` still names the incumbent's standing herd (feeds/care/harvest are
@@ -2380,7 +3251,7 @@ class Policy:
                 held = shed.get(best, 0)
                 per_species_want = (sp_best, env[sp_best] - counts.get(sp_best, 0),
                                     sum(env.values()))
-        if self.p["opening_led"]:
+        if self.p["opening_led"] or self.p.get("led_flock", False):
             # Dossier herd target, uniform. The SHOP KEYING lives in `animal_rank`: it prices
             # each species' product against the unlocked shop schedule, so a YARN_STORE draw
             # ranks sheep first and a pizza/ice/smoothie draw ranks cows first -- the rank
@@ -2397,7 +3268,23 @@ class Policy:
         if per_species_want is not None:
             sp, sp_left, env_total = per_species_want
             live_sp = max(0, counts.get(sp, 0) - shed.get(sp, 0))
+            # F2 (grind 0922b): UNCONDITIONED. The scoped form let `want` fall back to the
+            # ramp target once every envelope filled -- the judge trace showed want 11 -> 8
+            # at d18 with 11 animals standing, n_build negative, and zero post-envelope
+            # expansion. The want is the max of the envelope total and what the standing
+            # herd needs; it only ever FALLS when animals are actually lost.
             want = max(env_total, live_sp + shed.get(sp, 0))
+        elif ((self.p["elite_script"] or self.p["wool_lane"] > 0)
+                and not self.p["opening_led"]):
+            # A1 (ship 0922, the other half of the same bug): with the envelopes FULL,
+            # per_species_want stays None and `want` silently reverts to the ramp (8) --
+            # BELOW the standing herd, halting all expansion (verified want 11 -> 8 at d18
+            # on judge 886). When the portfolio is active at all, the season target is the
+            # envelope total; the ramp only governs the pre-portfolio build-up. The elite
+            # opening_led path is untouched (its ledger target governs).
+            want = max(want, self.p["herd_cow"]
+                       + max(self.p["herd_sheep"], self.p["wool_lane"])
+                       + self.p["herd_goose"])
         # The routine-feed premium is priced off the animal's mean daily product value, so the
         # feed job bids at what a missed day actually risks (goose ~$90, cow ~$45, sheep ~$30
         # at base) rather than at the wheat alone. Computed from the season programme, not
@@ -2422,6 +3309,19 @@ class Policy:
         # missed feed from escaping.
         buffer_ok = ((not starving)
                      and (mouths_buffer(shed, best, built, live) > 0 or (live + held) > 0))
+        # F3 (grind 0922b, judged NEGATIVE, shipped OFF): the d11-class DEADLOCK bypass.
+        # With zero animals anywhere (placed or shed) the buffer is 0 and the gate vetoes
+        # the FIRST buy forever -- mirror seed 2: the wave lands $12.4k at d11, cash bleeds
+        # to $0 by d16, the season dies at $4k with no animal ever placed. The bypass:
+        #   or (self.p.get("deadlock_admit") and live + held == 0
+        #       and sum(int(shed.get(sp, 0) or 0) for sp in ANIMALS) == 0
+        #       and not self.p["elite_script"]
+        #       and money >= OBJECT_TABLE[best]["buy_cost"]
+        #       + self.p["animal_pace"] * self.p["feed_bridge"] * max(1.0, wheat_px))
+        # It fixes the mirror seed-2 collapse ($4.1k -> $22-27.5k both seats) but on the
+        # judged field the extra buys dilute service on an existing herd (900/907: mean
+        # -$3.3k vs par; the blanket form without the zero-animals guard was -$7.1k on
+        # 900). Re-enable only behind a service-capacity fix.
         # -- feed-coverage gate (elite_counter_v1 P1, time-indexed). A new mouth must be
         # coverable on the day it eats, not "eventually": the bucket that counts is
         # cumulative feed-days SUPPLIED by that day. Three buckets, each dated: the shed
@@ -2432,7 +3332,8 @@ class Policy:
         # the time index a growing 20-tile wheat field "covers" mouths that starve
         # waiting for it -- the exact d11-13 dry-shed failure from the funnel traces.
         feed_ok = True
-        if self.p["elite_script"] and self.p["feed_backbone"]:
+        if ((self.p["elite_script"] or self.p.get("feed_backbone_def", False))
+                and self.p["feed_backbone"]):
             mouths_now = live + held + self.p["animal_pace"]   # this dawn's pending buys
             if mouths_now > 0:
                 horizon = min(SEASON_DAYS, day + 6)            # until field income lands
@@ -2483,7 +3384,12 @@ class Policy:
             # Unit count is a WORKLOAD decision: take the smallest share whose planned
             # loops fit the stream's own days (raw turns -- a visit is an op plus its walk,
             # ~2 turns). One shepherd cannot serve 4 animals (30-turn loop > 20-turn day).
-            per_unit = 2 * capacity(3.0 + 1.5 * max(0, len(unlocked) - 1)) - 4
+            # Shed-anchored per-unit budget (grind 0921 d): the loops are shed-anchored,
+            # so the budget keeps a constant ring commute instead of shrinking toward 12
+            # as quadrants unlock -- that shrink is what re-vetoed buys at herd 10-13
+            # (2-animal ring clusters cost ~14-16 real turns; the area-scaled budget
+            # said 12+3). Crops keep the area-scaled term; the herd keeps the ring's.
+            per_unit = 2 * capacity(3.0) - 4
             # The -4 prices what the loop builder cannot see: the unit's dawn position to
             # its shed head (shepherds spawn on the access tiles but finish yesterday
             # wherever the loop ended), plus scheduling slack. Without it the cap admits
@@ -2494,46 +3400,245 @@ class Policy:
             # CARE, so an average-fitting overload cuts cares first and silently halves
             # the herd's yield multiplier.
             svc_margin = self.p["service_margin"] if self.p["elite_script"] else 0
-            for n_sh in range(1, self.p["shepherd_share"] + 1):
-                l_try, b_try, c_try = shepherd_loops(
-                    live_structs, day, unlocked, n_units=n_sh,
+            if self.p.get("care_gate", False) and not self.p["elite_script"]:
+                # B1 (ship 0922, care-rate gate; dossier constants from
+                # analysis/majkel_labor.py): the default arm gets the elite EXACT care
+                # test. svc_margin=3 lets every loop cost per_unit+3; measured Majkel
+                # d8-20: 8.78 animal-workers / 15.6 herd = 1 worker per 1.8 animals, 88%
+                # end-of-day care sustainable (99% only at his peak). The gate is the
+                # admission control for B2/B3 -- without it the F3/F6 service-dilution
+                # regressions repeat.
+                svc_margin = self.p["service_margin"]
+            # grind 0921: the share scales with the standing herd. The constant share=4
+            # froze expansion at ~7 animals -- full_ok then vetoed every buy forever
+            # (n_buy_cap=0 from d15 with $3-10k idle). The census shepherds ~2.5-3
+            # animals per unit; grow the share with the herd so the veto fires only
+            # when the ROSTER, not a constant, is exhausted. Never exceeds
+            # max_hands-1 (the farmer and the crop loop still need units).
+            share_cap = self.p["shepherd_share"]
+            if self.p["elite_script"] or self.p.get("shepherd_share_grow", False):
+                # B2 (ship 0922): the growing share reaches the DEFAULT arm under the
+                # care gate, ratio re-anchored to the dossier's 1 worker per 1.8 animals
+                # ((live+2)//2 with +2 so the floor is reached a step early). The elite
+                # form (1 per 2.5-3, //3) is preserved byte-for-byte.
+                if self.p.get("care_gate", False) and not self.p["elite_script"]:
+                    share_cap = min(max(self.p["shepherd_share"], (live + 2) // 2 + 1),
+                                    max(1, self.p["max_hands"] - 1))
+                else:
+                    share_cap = min(max(self.p["shepherd_share"], (live + 2) // 3 + 1),
+                                    max(1, self.p["max_hands"] - 1))
+            def _serve_plan(n):
+                # 0924i: chain, with the rebuilt wheel scheduler as the overload
+                # fallback. The chain's bulk PICKUP wins wherever it fits; its
+                # 99-turn clusters are the overload the gate keeps reading, and
+                # that regime is where the wheel's bounded per-trip cost wins
+                # (+$8.4k on judge 886). wheel_plan=1 forces the wheel outright.
+                if self.p.get("wheel_plan", 0):
+                    return wheel_plan(live_structs, day, unlocked, n_units=n,
+                                      care=self.p["animal_care"])
+                l, b, c = shepherd_loops(
+                    live_structs, day, unlocked, n_units=n,
                     bag_cap=self.p["shepherd_bag"], care=self.p["animal_care"],
-                    balance=self.p["elite_script"])
+                    balance=self.p["elite_script"], commute=3.0)
+                # Hard trigger ONLY (total budget). The max-loop clause fired on
+                # every big-herd judge (a chained feed-block always exceeds a day
+                # at herd >= 9), which put the wheel everywhere and gave back the
+                # -7 to -10k the chain-free form costs where the chain fits. The
+                # overload that actually kills animals is the total budget: at
+                # herd 11 the chain costs 107 of 110 -- THAT is the regime the
+                # wheel's bounded trips rescue (measured +$8.4k on judge 886).
+                if self.p.get("wheel_fallback", 0) and b > n * per_unit:
+                    return wheel_plan(live_structs, day, unlocked, n_units=n,
+                                      care=self.p["animal_care"])
+                return l, b, c
+
+            for n_sh in range(1, share_cap + 1):
+                l_try, b_try, c_try = _serve_plan(n_sh)
                 # The latest attempt is ALWAYS kept: the plan's budget feeds diagnostics
                 # and the live herd is served even on an overloaded dawn (the old
                 # `or n_sh == share` semantics -- losing it blanked the budget to 0).
                 loops, budget = l_try, b_try
                 if (b_try <= n_sh * per_unit
                         and (max(c_try, default=0) <= per_unit + svc_margin
-                             or n_sh == self.p["shepherd_share"])):
+                             or n_sh == share_cap)):
                     break
-            # Co-feasibility, NON-STICKY: n_buy is capped when even a full-share stream
-            # cannot fit the projected herd's chores in its units' days. No memory -- the
-            # earlier `want=live` freeze was sticky: one overloaded dawn froze the ramp
-            # permanently even after wages freed capacity and buffer_ok re-opened (the
-            # buys=2 stall in the shepherd8 funnel). When the load test passes again the
-            # next dawn, buys resume; the live herd is served unconditionally.
-            _, b_full, c_full = shepherd_loops(
-                live_structs, day, unlocked, n_units=self.p["shepherd_share"],
-                bag_cap=self.p["shepherd_bag"], care=self.p["animal_care"],
-                balance=self.p["elite_script"])
-            full_ok = b_full <= self.p["shepherd_share"] * per_unit
-            if self.p["elite_script"] and full_ok:
+            # Co-feasibility, NON-STICKY (grind 0921 v2): the gate now tests the
+            # PROJECTED stream -- the live herd PLUS the animals we are about to admit
+            # (pace / backlog headroom). The old current-herd test admitted exactly the
+            # buy that broke it: at live=4 it passed (33<=64), the pace=3 buy landed,
+            # and the next dawn the 7-animal stream cost 92 > 56 -> n_buy_cap=0 for the
+            # rest of the season (and the overloaded stream killed 3 animals by d26).
+            # The share itself now GROWS with the projected herd (census: ~1 shepherd
+            # per 2.5-3 animals, capped by max_hands-1 so crops keep hands) instead of
+            # a constant that goes stale as per_unit shrinks with quadrants unlocked.
+            def _stream_cost(n):
+                _, bb, cc = _serve_plan(n)
+                return bb, cc
+            _pace = self.p["animal_pace"]
+            _backlog = sum(int(shed.get(sp, 0) or 0) for sp in ANIMALS)
+            # projected herd = live + unplaced + the pace buys this dawn would admit,
+            # never past `want` (the season target is the point of the envelope).
+            _proj = live + _backlog + max(0, min(_pace, want - live - _backlog))
+            # Growth roof (grind 0921 c): shepherds scale with the HERD (own-cluster
+            # service needs ~1 unit per 2 animals at ring distance) but never exceed
+            # max_hands-1 -- crops keep the remainder. The old roster-only roof (6 at
+            # max_hands=11) forced a 7th animal into a doubled cluster whose care tail
+            # then vetoed every buy: the freeze shifted from the gate to the roof.
+            _share_roof = min(max(self.p["shepherd_share"], (_proj + 1) // 2),
+                              max(1, self.p["max_hands"] - 1))
+            if self.p.get("care_gate", False) and not self.p["elite_script"]:
+                # B2 roof, dossier ratio: 1 shepherd per 1.8 animals, so a herd of
+                # 16 projects a 9-10 unit share instead of stalling at the
+                # constant 4 (the reason buys froze at herd 7 on the judges).
+                _share_roof = min(max(self.p["shepherd_share"], (_proj + 1) // 2 + 1),
+                                  max(1, self.p["max_hands"] - 1))
+            b_full, c_full = _stream_cost(share_cap)
+            while (share_cap < _share_roof
+                   and (b_full > share_cap * per_unit
+                        or ((self.p["elite_script"] or self.p.get("care_gate", False))
+                            and max(c_full, default=0) > per_unit + svc_margin))):
+                share_cap += 1
+                b_full, c_full = _stream_cost(share_cap)
+            full_ok = b_full <= share_cap * per_unit
+            if ((self.p["elite_script"] or self.p.get("care_gate", False)) and full_ok):
                 full_ok = max(c_full, default=0) <= per_unit + svc_margin
             n_buy_cap = 0 if not full_ok else self.p["animal_pace"]
         # Backlog gate (hardening #3): animals in the shed are mouths that eat but produce
         # nothing until PLACEd. Past a small backlog, new buys only deepen the pile --
         # placement is gated by shepherd loops and structure builds, not by cash.
+        # 0924f re-audit: the default-arm count-cap proposed here measured -$7.8k mean
+        # (56.3k vs 64.1k, every seed down) -- dawn programs legitimately buy 2-3 animals
+        # while 1-2 are mid-flight, and structures are FREE (BUILD_PASTURE needs only an
+        # empty tile), so placement never structurally stalls. REVERTED; elite cap only.
         backlog = sum(int(shed.get(sp, 0) or 0) for sp in ANIMALS)
         if self.p["elite_script"] and backlog > self.p["backlog_cap"]:
             n_buy_cap = 0
-        # Bound first: n_build's pending-mouths test reads the same value, and dict
-        # literals evaluate keys in order -- referencing `n_buy` from n_build's value
-        # raised NameError (the buy entry below is not yet bound at that point).
-        n_buy_val = (max(0, min(self.p["animal_pace"], n_buy_cap, want - live - held))
+        # grind 0922 P2 (feed-surplus floor): the legacy `pace*cost*2` wall demanded
+        # $2,400-$3,000 for ANY buy and blocked exactly the d6 wool-windfall reinvest
+        # (Majkel: $3.1k of wool -> 5 cows the same day). The two cheaper variants
+        # tested 0921 (raw cost, cost+2d grain) collapsed the mirror to $14k because
+        # they bought at thin banks with NOTHING held back for the bridge. This form
+        # prices the floor as what the buy actually costs plus the herd's MISSING
+        # 2-day grain bridge at the real wheat price plus a small reserve: a purchase
+        # leaves the herd -- including the arriving mouths -- funded to feed for two
+        # days BY CONSTRUCTION, and a shed already holding grain lowers the floor
+        # naturally. The 0921 failures are unreachable in this form: the bridge money
+        # is inside the floor, not spent by the buy. Baseline arm keeps legacy.
+        # grind 0922 P2c: the floor is FIELD-CADENCE based and k-scaled. Two measured
+        # facts drive the form: (1) the legacy wall (pace*cost*2 = $2,400-3,000 regardless
+        # of herd) blocked exactly the d6 wool-windfall reinvest (dossier: $3.1k of wool
+        # -> 5 cows the SAME day), and the P2 fixed-bridge form was both a no-op at the
+        # margin and a mirror collapse when admitted early (seed 0: $14k); (2) the 0921
+        # failures bought at thin banks with nothing held back for the bridge -- so this
+        # form admits the largest k <= pace the bank can carry WITH the mouths' bridge
+        # priced from the REAL field cadence, and the bridge money is inside the floor
+        # (spent by the buy? no -- reserved by construction, so feed_ok's market backstop
+        # stays funded post-buy: the two gates compose instead of double-gating).
+        _n_admit = max(0, min(self.p["animal_pace"], n_buy_cap, want - live - held))
+        # Per-species last-profitable-buy day (dossier adoption, engine-exact event math):
+        # 2+ production events needed for NPV > 0. cow D+8,+10<=29 -> 19; sheep D+6,+9 -> 20;
+        # goose D+4,+5 -> 24. The shipped calendar stop (endgame_days) admits cows at d22-24
+        # that produce once and never pay for their feed.
+        if _n_admit > 0 and self.p.get("animal_stop_species", 0):
+            _dl = {"COW": 19, "SHEEP": 20, "GOOSE": 24}.get(best)
+            if _dl is not None and day > _dl:
+                _n_admit = 0
+        _cost = OBJECT_TABLE[best]["buy_cost"]
+        # 0925f wave_share_animal: the settled windfall's share buys extra mouths -- the
+        # judges' 14-21 placed herds are funded exactly this way (wool pop -> cows the
+        # SAME day). The boost extends the k-admit afford loop's own upper bound, so the
+        # bridge grain is PRICED FOR THE FULL k (never an unfunded mouth) and the bank
+        # still carries it -- the loop admits the largest affordable k, wave-funded or
+        # not. Service gate respected (wave_k = 0 when the care gate says n_buy_cap 0);
+        # herd-level headroom bounds it; inert without the k-admit machinery (flock_arm
+        # or feed_floor arms it) because the legacy wall branch never sees it.
+        _wave_share = self.p.get("wave_share_animal", 0) or 0
+        _wave_k = 0
+        if (_wave_share > 0 and self.wave_cash > 0 and n_buy_cap > 0
+                and ((self.p["elite_script"] and self.p["feed_floor"])
+                     or self.p.get("led_flock", False)
+                     or (self.p.get("k_admit_def", 0) and not self.p["elite_script"]))):
+            _wave_k = int(self.wave_cash * _wave_share // max(1.0, _cost))
+            _wave_k = max(0, min(_wave_k, want - live - held - _n_admit))
+        # k_admit_def (0924j): the P2c field-cadence floor on the DEFAULT arm. Same form,
+        # same composition with feed_solvency -- the two tapes showed the legacy wall
+        # (pace*cost*2) buying ZERO animals all season while the winner bought 20.
+        if ((self.p["elite_script"] and self.p["feed_floor"])
+                or self.p.get("led_flock", False)
+                or (self.p.get("k_admit_def", 0) and not self.p["elite_script"])):
+            _px_w = max(wheat_px, 10.0)
+            # Days until the next standing wheat harvest (a live field shortens the
+            # bridge; a bare field prices the worst case). Clamped to [1, feed_days_max].
+            _next_hd = None
+            for _yy in range(BOARD_SIZE):
+                for _xx in range(BOARD_SIZE):
+                    if quadrant_of(_xx, _yy) not in unlocked:
+                        continue
+                    _t5 = tiles[_yy][_xx]
+                    if isinstance(_t5, dict) and _t5.get("kind") == "PLANT" \
+                            and _t5.get("crop") == "WHEAT":
+                        _hd = _t5.get("planted_day", day) + CROP_PLAN["WHEAT"]["harvest_day"]
+                        if _hd > day and (_next_hd is None or _hd < _next_hd):
+                            _next_hd = _hd
+            _bridge_days = (min(max(1, _next_hd - day), self.p["feed_days_max"])
+                            if _next_hd else self.p["feed_days_max"])
+            _shed_w = int(shed.get("WHEAT", 0) or 0)
+            # Largest k the bank carries with its bridge -- the windfall reinvest: k
+            # scales with cash the way the census converts a wool pop into cows.
+            _k = 0
+            for _try in range(_n_admit + _wave_k, 0, -1):
+                _mouths_after = live + backlog + _try
+                _grain_need = max(0, _bridge_days * _mouths_after - _shed_w)
+                if _try * _cost + _grain_need * _px_w <= money - self.p["poverty_reserve"]:
+                    _k = _try
+                    break
+            if _k <= 0:
+                _n_admit = 0
+                _cost_floor = float("inf")
+            else:
+                _n_admit = _k
+                _cost_floor = (_k * _cost + _grain_need * _px_w
+                               + self.p["poverty_reserve"])
+        else:
+            _cost_floor = self.p["animal_pace"] * OBJECT_TABLE[best]["buy_cost"] * 2
+        money_gated = not (money > _cost_floor)
+        # gate_log (grind 0921): the named blocking gate for the freeze hunt. Cheap and
+        # always written; probes read it, nothing branches on it.
+        self.gate_log = dict(rank_ok=rank_ok, in_time=in_time_, buffer_ok=buffer_ok,
+                             feed_ok=feed_ok, money_gated=money_gated,
+                             n_buy_cap=n_buy_cap, want=want,
+                             share_cap=locals().get("share_cap", 0),
+                             per_unit=locals().get("per_unit", 0),
+                             b_full=locals().get("b_full", 0),
+                             c_full=(max(_c, default=0) if isinstance(_c := locals().get("c_full", None), list) else (_c or 0)),
+                             live=live, held=held, built=built, backlog=backlog)
+        # P2c: under the cadence floor the plan quantity is the k-ADMITTED count (the
+        # windfall reinvest: 5 cows when the bank carries 5, not all-or-nothing pace).
+        # The emission's afford cap still guards the bank; the bridge is inside the floor.
+        _pace_plan = (_n_admit if ((self.p["elite_script"] and self.p["feed_floor"])
+                                   or self.p.get("led_flock", False)
+                                   or (self.p.get("k_admit_def", 0)
+                                       and not self.p["elite_script"]))
+                      else min(self.p["animal_pace"], n_buy_cap, want - live - held))
+        # Portfolio envelope clamp (grind 0922): `want - live - held` is HERD-level, but
+        # the portfolio picked `best` for a SPECIES envelope -- at herd 11 with one sheep
+        # slot left it bought pace-sized SHEEP x3 and the placement stream rotted one.
+        # The chosen species' own headroom bounds the order. DEFAULT ARM ONLY: the elite
+        # arm's opening is stream-sized and measured ($30.5k seed 0); clamping there
+        # over-restrained the ramp and collapsed it to $11.4k -- its buys are already
+        # bounded by the projected co-feasibility and backlog gates.
+        if (per_species_want is not None and per_species_want[0] == best
+                and not self.p["elite_script"]):
+            # 0925f: the species envelope is a design PRIOR, and the wave-funded share
+            # buys past it (the judges' 14-21 herds ignore our 11-envelope mix). The
+            # envelope still governs every non-wave mouth; only _wave_k rides above it,
+            # and the service + afford gates still bind. _wave_k=0 -> shipped clamp.
+            _wave_share_ = self.p.get("wave_share_animal", 0) or 0
+            _extra = _wave_k if _wave_share_ > 0 else 0
+            _pace_plan = min(_pace_plan, max(0, per_species_want[1] + _extra))
+        n_buy_val = (max(0, _pace_plan)
                      if (in_time_ and buffer_ok and feed_ok
-                         and money > self.p["animal_pace"]
-                         * OBJECT_TABLE[best]["buy_cost"] * 2) else 0)
+                         and money > _cost_floor) else 0)
         return dict(animal=best, struct=ANIMAL_STRUCTURE[best], rank=best_r,
                     worth=best_r * (best_prog["visits"] if best_prog else 40),
                     fert_px=fert_px, wheat_px=wheat_px, held=held, live=live, built=built,
@@ -2545,12 +3650,16 @@ class Policy:
                     # raised 9 empty structures by d15 (13 built / 4 filled) because n_build
                     # ran off the season target, not off pending placements. Baseline keeps
                     # the original build-ahead form byte-identical.
+                    # F2 n_build guard (grind 0922b): clamp at 0 -- a want below the built
+                    # count produced negative n_build (latent; benign only because
+                    # range(negative) is empty). Removed from the return: measured
+                    # byte-inert on the 0922b panel.
                     n_build=(min(self.p["animal_pace"], want - built)
                              if (in_time_ and not self.p["elite_script"])
                              else (min(self.p["animal_pace"],
                                        max(0, min(held + n_buy_val, want - built)))
                                    if (in_time_ and held + n_buy_val > 0) else 0)),
-                    n_buy=n_buy_val)
+                    n_buy=n_buy_val, gates=dict(getattr(self, "gate_log", {})))
 
 
     def _spawn_guess(self, n, units):
@@ -2600,8 +3709,28 @@ class Policy:
         # roster, while our demand-sized roster hires 0-4 on d1-9 (ledger: the d1-9 labour
         # trough, ~30-40 orders of early capacity wasted). The Fibonacci cash cap below
         # still applies -- the floor is a floor on INTENT, not on spend.
+        # led_roster_ramp (majkel_skeleton, smoke seed 0): the census roster RAMPS 4 -> 5
+        # -> 6 -> 7 ... as wool cash arrives -- it does NOT open at 11. A flat floor prices
+        # intent with a ~$376/day recurring wage bill against $0 income for a week: the
+        # bank hits $0 by d2 and the fib cash cap then blocks EVERYTHING (seeds, grain,
+        # even the hires themselves). The ramp target grows one hand per day, each day's
+        # bill affordable from cash on hand, so the roster tracks the farm's actual income.
         if self.p["opening_led"]:
-            n = max(n, min(self.p["led_roster_floor"], self.p["max_hands"]))
+            floor = self.p.get("led_roster_ramp", 0)
+            if floor:
+                # Day 0 keeps the script's t2 bundle (led_hire2=4); from d1 the target
+                # climbs with cash growth -- day count + 3, capped by max_hands.
+                target = min(self.p["max_hands"], 3 + day)
+                n = max(n, target)
+            else:
+                n = max(n, min(self.p["led_roster_floor"], self.p["max_hands"]))
+        # hire_floor_n (0924j, default arm): hire ahead of demand through the pre-income
+        # window. The demand sizer under-hires exactly when the board is seed-light (the
+        # jobs don't exist yet because the seeds haven't been bought) -- the census hires
+        # the crew FIRST and the field catches up. Fib cash cap below still applies.
+        _hfn = int(self.p.get("hire_floor_n", 0) or 0)
+        if _hfn > 0 and day <= int(self.p.get("hire_floor_day", 0) or 0):
+            n = max(n, min(_hfn, self.p["max_hands"]))
         while n > 0 and sum(fib_hire_cost(i) for i in range(n)) > money:
             n -= 1
         return n
@@ -2662,22 +3791,51 @@ class Policy:
         # serpentine pool -- their loops are multi-step objects that must not be cut by
         # the value lottery (that lottery is exactly how the 20-herd starved). Shepherds
         # are the units already nearest the shed; everyone else shares what remains.
+        #
+        # grind 0922 (the FEED execution seam): the shepherd set is PINNED for the day.
+        # The roster re-cut fires on every HIRE batch, and hands spawn on shed-access
+        # tiles, so each arrival re-sorted the nearest-shed ranking and the old code
+        # re-derived the shepherds AND overwrote their queues with the full loop from
+        # its head -- every re-cut reset every in-progress loop to the shed and shifted
+        # the loop<->unit pairing. That restart churn is the traced 7-9-of-21 FEED gap.
+        # Now: choose the pairing once at the dawn plan, keep it across re-cuts, and
+        # never overwrite a shepherd queue that is still mid-progress. If a pinned id
+        # vanished (a hire failed for cash), the pins rebuild and the morning restarts
+        # -- the degraded case falls back to the old behavior rather than stranding a
+        # loop with no unit.
         shepherds = set()
         if self.p["shepherd_mode"] and self.animals and self.animals.get("loops"):
             loops = self.animals["loops"]
-            sheds_open = [pp for q, pp in SHED_TILES.items() if q in unlocked] \
-                or [SHED_TILES["NW"]]
-            shepherds = {i for i, _ in sorted(
-                units, key=lambda u: min(manhattan(u[1], p) for p in sheds_open)
-            )[:len(loops)]}
+            # The wheel plan (0924i) returns index-parity lists with EMPTY placeholders
+            # (the gate's max() reads loop_costs positionally); the chain only returns
+            # non-empty loops. Pinning an empty loop makes the unit a shepherd with no
+            # queue -- it then idles all day OUTSIDE the serpentine crop pool. Filter
+            # before pinning: a no-op for the chain, correct for the wheel.
+            loops = [lp for lp in loops if lp]
+            pins = self.shepherd_pins
+            if not (pins and pins.get("day") == day
+                    and all(i in dict(units) for i in pins["ids"])):
+                sheds_open = [pp for q, pp in SHED_TILES.items() if q in unlocked] \
+                    or [SHED_TILES["NW"]]
+                ids = [i for i, _ in sorted(
+                    units, key=lambda u: min(manhattan(u[1], p) for p in sheds_open)
+                )[:len(loops)]]
+                pins = {"day": day, "ids": ids, "assigned": set()}
+                self.shepherd_pins = pins
+            shepherds = {i for i in pins["ids"] if i in dict(units)}
             by_pos = {i: p for i, p in units}
-            for si, loop in zip(sorted(shepherds), loops):
+            for si, loop in zip(pins["ids"], loops):
+                if si not in shepherds:
+                    continue
+                if si in pins["assigned"] and self.queues.get(si):
+                    continue          # mid-progress: keep the queue, never restart it
                 start = by_pos.get(si)
                 if start is not None:
                     loop[0]["pos"] = start if loop[0]["op"][0] != "PICKUP" else loop[0]["pos"]
                 self.queues = self.queues or {}
                 self.queues[si] = [dict(j, carried=j.get("carried", j["op"][0] != "PICKUP"))
                                    for j in loop]
+                pins["assigned"].add(si)
         # The serpentine pool excludes the shepherds; if none remain the day is livestock.
         serp_units = [(i, p) for i, p in units if i not in shepherds] or units
         if shepherds and self.animals:
@@ -2686,6 +3844,46 @@ class Policy:
             self.queues.update({i: list(r) for i, r in runs.items() if i not in shepherds})
         else:
             self.queues = {i: list(r) for i, r in runs.items()}
+        # -- lane keep (s1223 move-share build). A mid-day recut (roster growth) rebuilt
+        # every lane from the whole remaining job list, re-pointing standing units' head
+        # jobs -- measured 561 redirects (378 far) per episode, concentrated on the
+        # valley days when the hire batches arrive. Lane-keep semantics: standing queues
+        # are KEPT verbatim (a lane's dawn cut already budgets its unit's whole day, so
+        # appending to it is impossible by construction), and the UNQUEUED residual is
+        # cut into lanes for the IDLE units only -- the just-arrived hands. Jobs queued
+        # nowhere and fitting no idle unit fall back to the legacy whole-board re-cut.
+        if (self.p.get("lane_keep", False) and hour > 0
+                and getattr(self, "queues", None)):
+            units_pos = dict(units)
+            # Shepherd lanes are chore loops -- never re-cut one.
+            standing = {i: list(q) for i, q in self.queues.items() if i not in shepherds}
+
+            def _jkey(j):
+                return (j["pos"], j["op"][0],
+                        j["op"][1] if len(j["op"]) > 1 else None)
+            queued = set()
+            for q in standing.values():
+                for j in q:
+                    queued.add(_jkey(j))
+            residual = [j for j in take
+                        if _jkey(j) not in queued
+                        and self._valid(j, tiles, day, None, hour)]
+            idle = [(i, units_pos[i]) for i in standing
+                    if not standing[i] and i in units_pos]
+            placed = False
+            if residual and idle:
+                residual.sort(key=lambda j: serpentine_key(j["pos"]))
+                runs2 = split_runs(residual, idle, turns_left, deliver_reserve=reserve)
+                for i2, r2 in runs2.items():
+                    standing[i2] = list(r2)
+                placed = True
+            # No idle walker and residual work: keep every standing queue verbatim.
+            # The legacy whole-board re-cut here is the redirect churn itself -- it
+            # re-points busy units away from lanes they are mid-way through. The
+            # residual is picked up by whichever lane drains first (work_steal),
+            # or by the next recut; a queue that runs dry with work on the board
+            # steals rather than PASSes.
+            self.queues = standing
         # Prepend the feed chores after the runs are cut: the chore displaces the
         # geometrically-last crop job of one unit, which is exactly the right thing to displace,
         # and running first is what makes the chain immune to both the value cut and midnight.
@@ -2910,6 +4108,28 @@ class Policy:
                 while q and not self._valid(q[0], tiles, day, stock, hour):
                     q.pop(0)
             carrying = sum((invs[idx] or {}).values()) if idx < len(invs) else 0
+            # -- bagless-FEED repair (grind 0922). A shepherd loop's FEED legs are marked
+            # `carried` at ASSIGNMENT time, but the grain only enters the bag when the
+            # loop's PICKUP head executes. When it could not -- the shed grain read 0 at
+            # that turn (the wheat field had not harvested yet, or the buy settles
+            # end-of-turn) -- the carried FEED legs passed `_valid` on the flag alone and
+            # executed empty-handed: the engine no-ops a FEED without wheat, so every leg
+            # burned its turn AND its chore while the plan said the herd was fed. Repair:
+            # re-queue a grain run sized to the feeds still owed; if the loop's own PICKUP
+            # is already parked in the queue, defer the bagless FEED behind the legs that
+            # need no grain (CARE/HARVEST run fine empty-handed).
+            bag_wheat = (invs[idx] or {}).get("WHEAT", 0) if idx < len(invs) else 0
+            if q and q[0]["op"][0] == "FEED" and q[0].get("carried") and bag_wheat <= 0:
+                if not any(j["op"][0] == "PICKUP" for j in q):
+                    owed = sum(1 for j in q if j["op"][0] == "FEED" and j.get("carried"))
+                    q.insert(0, dict(pos=nearest_shed(q[0]["pos"], unlocked),
+                                     op=["PICKUP", "WHEAT", max(1, min(owed, 24))],
+                                     stock_key=_FEED, acts=1, is_loop=True))
+                else:
+                    for _ in range(len(q)):
+                        if not (q and q[0]["op"][0] == "FEED" and q[0].get("carried")):
+                            break
+                        q.append(q.pop(0))
             # -- haul discipline. SELL settles from the shed and HARVEST fills a bag, so
             # produce is worth nothing until somebody walks it home. On a normal day midnight
             # does that for free -- occupancy peaks in the thirties and nothing is lost -- so
@@ -3082,15 +4302,92 @@ class Policy:
         """
         money = me.get("money", 0.0)
 
+        # -- opponent census + season price peaks (grind 0922 P3). `farms[]` is documented
+        # public per-player state (engine json: tiles, money, positions, unlocked quadrants),
+        # so the rival herd is countable every turn at trivial cost. The census feeds the
+        # milk-sell hold: a big rival cow herd means the milk window is short and the glut
+        # is coming; a small herd means the window runs long and the drip is safe. Peaks
+        # date the window: holding is only correct once the price has ROLLED OFF the
+        # season's best -- never hold into a fresh high.
+        try:
+            _fo = (obs.get("farms") or [])
+            _opp_f = (_fo[(1 - obs.get("player", 0)) % len(_fo)] if len(_fo) > 1 else None)
+            if day <= 1:
+                self.eff_endgame = None   # new episode: a pooled process must not inherit
+                                          # the previous game's fired shift
+            if isinstance(_opp_f, dict):
+                _occ = {"COW": 0, "SHEEP": 0, "GOOSE": 0}
+                for _row in (_opp_f.get("tiles") or []):
+                    for _t in (_row or []):
+                        if isinstance(_t, dict) and _t.get("kind") in ("COOP", "PASTURE") \
+                                and _t.get("animal"):
+                            _occ[_t["animal"]] = _occ.get(_t["animal"], 0) + 1
+                self.opp_census = _occ
+                # -- endgame_shift (ELO-first C): the rival's bank is PUBLIC per turn.
+                # On the day before the full-clear window opens, a materially trailing
+                # game shifts the sell regime into it one day early: the reserve floors
+                # come off d24 instead of d25 (endgame_days=5), so the metering delays
+                # that protect prices in a LEADING game stop costing days in a losing one. The gap is
+                # measured in base-equivalent value (a raw $750 in a $25-base economy is
+                # inside a normal market's hour-to-hour swing; 10% of the board's base
+                # value is not). Never fires when leading or tied, and off-shift days
+                # keep the shipped `endgame = day >= SEASON_DAYS - endgame_days` form.
+                # No per-day hysteresis: the shift is one-sided (trailing only), so it
+                # cannot oscillate -- the only swing is trailing->recovered, and an early
+                # full-clear that keeps running after recovery is exactly the panic-clear
+                # the loss tapes wanted.
+                _opp_money = _opp_f.get("money", 0.0)
+                _gap = _opp_money - money
+                _we = SEASON_DAYS - self.p["endgame_days"]
+                _shift_on = (self.p.get("endgame_shift", 0) > 0
+                             and day == _we - 1
+                             and _gap > 0.0
+                             and _gap > self.p.get("endgame_shift_gap", 0.10)
+                             * self._base_equiv_value(prices))
+                if _shift_on:
+                    self.eff_endgame = _we - 1
+                elif self.eff_endgame is None:
+                    self.eff_endgame = None      # stay shipped until the read fires
+            else:
+                self.opp_census = _occ
+        except Exception:
+            pass                    # a harness without a rival farm keeps the zero census
+        for _g, _px in (prices or {}).items():
+            if _px and _px > self.px_peak.get(_g, 0.0):
+                self.px_peak[_g] = _px
+
         # opening_led day-0 script: animals before seeds. Emitted into `d0` so the seed and
         # hire sizing below sees the REDUCED bank -- the day-0 seed round stays the only
         # compounding purchase, but the herd is the first compounding ASSET (dossier:
         # every elite game opens BUY_ANIMAL COW + grain on turn 1, before any seed).
         d0 = []
+        # flock_stage2_mode's stage-2 shaping, set BEFORE the script emits (the reserve
+        # section below runs after emissions and must not re-derive it). -1 floor = elite
+        # raw form (byte-identical).
+        #   mode 1 (stage-1-only opening): ZERO the stage-2 targets for the whole
+        #       script+reserve span -- t1 emits the founding cow + grain only, the owe
+        #       below nets stage 1 only, and the d0 seed round keeps the melon wave
+        #       (the 0925f smoke: whole-flock netting crushed the wave $17.4k -> $3.3k).
+        #       The deferred mouths are the dawn planner's job -- its k-admit gate plus
+        #       wave_share_animal turns the d6 wool pop and the d10-11 wave into the
+        #       herd. Restored right after the reserve.
+        #   mode 2 (same-turn surplus): the whole flock emits at t0 but every stage-2
+        #       mouth must leave the bank at or above the seed floor.
+        _stage2_floor = -1
+        _s2_cow2 = self.p["led_cow2"]
+        _f2m_live = int(self.p.get("flock_stage2_mode", 0) or 0) \
+            if (self.p.get("flock_arm", 0) and not self.p["elite_script"]) else 0
+        if _f2m_live == 2:
+            _stage2_floor = self.p["seed_floor"]
+        _flock_stage1_only = _f2m_live == 1
+        if _flock_stage1_only:
+            _stage2_owe_save = (self.p["led_cow2"], self.p["led_sheep0"])
+            self.p["led_cow2"], self.p["led_sheep0"] = 0, 0
+            _s2_cow2 = 0
         # The FSM window is d0-d1: a slot-capped turn (10 orders max) spills the bundle's
         # tail into the next turn, and `day == 0` alone cut the third sheep off forever
         # (t1 emitted 1 of 2 sheep, then the gate closed at dawn 1 -- mirror seed 0).
-        if self.p["opening_led"] and day <= 1:
+        if (self.p["opening_led"] or self.p.get("led_flock", False)) and day <= 1:
             # Settlement-based guards (elite_script P0-4): count OBSERVED purchases
             # (placed + in-shed) so a failed or partial order retries next turn instead
             # of being swallowed by a flag. The umbrella `animal` key still blocks the
@@ -3107,6 +4404,11 @@ class Policy:
             # the shed: $500 of dead working capital, and the dossier's d0 residual
             # after the script is ~$300-500 of seed money, not $108.
             placed_mouths = sum(placed.values())
+            # Grain target tracks the OWNED-OR-SCRIPTED herd (have grows as each animal
+            # order emits): all 5 mouths eat from d4, the field's first harvest is ~d5,
+            # so the bridge must cover the SCRIPT herd, not the animals already placed.
+            script_herd0 = (self.p["led_cow0"] + self.p["led_cow2"] + self.p["led_sheep0"])
+            grain_mouths = max(1, min(sum(have.values()), script_herd0))
             cow_cost = OBJECT_TABLE["COW"]["buy_cost"]
             sheep_cost = OBJECT_TABLE["SHEEP"]["buy_cost"]
             px_w = prices.get("WHEAT", _base("WHEAT"))
@@ -3146,8 +4448,13 @@ class Policy:
                 have["COW"] = have.get("COW", 0) + 1
                 mouths += 1
                 n_animals_turn += 1
-                _top_grain(max(self.p["led_wheat0"], bridge * max(1, placed_mouths)))
-            if self.p["elite_script"]:
+                _top_grain(max(self.p["led_wheat0"], bridge * grain_mouths))
+
+            if (self.p["elite_script"] or self.p.get("led_flock", False)):
+                # Stage-2 surplus floor (flock_stage2_mode) is already set above, next to
+                # the d0 block's own init. The elite arm keeps its raw-form gates (the
+                # majkel_skeleton wave is smaller and its d0 residual was measured at
+                # ~$300-500 on purpose).
                 # Stage 2 (the elite t2 bundle): the second cow plus the sheep wool lane.
                 # EVERY mouth is gated on the shed covering `bridge` days of feed for the
                 # herd it joins -- the smoke-caught failure mode: capital all spent on
@@ -3155,22 +4462,24 @@ class Policy:
                 # whole d0 script is a $2.4k write-off. A mouth that cannot be fed is
                 # not a purchase, it is a loss.
                 if have.get("COW", 0) >= min(1, self.p["led_cow0"]) \
-                        and have.get("COW", 0) < self.p["led_cow0"] + self.p["led_cow2"] \
-                        and money >= cow_cost and n_animals_turn < 2:
-                    _top_grain(bridge * max(1, placed_mouths))
-                    if grain >= bridge * max(1, placed_mouths):
+                        and have.get("COW", 0) < self.p["led_cow0"] + _s2_cow2 \
+                        and money >= cow_cost and n_animals_turn < 2 \
+                        and money - cow_cost >= _stage2_floor:
+                    _top_grain(bridge * grain_mouths)
+                    if grain >= bridge * grain_mouths:
                         d0.append(["BUY_ANIMAL", "COW", 1])
                         money -= cow_cost
                         self.ordered["animal"] = 1
                         have["COW"] += 1
                         mouths += 1
                         n_animals_turn += 1
-                        _top_grain(bridge * max(1, placed_mouths))
+                        _top_grain(bridge * grain_mouths)
                 while have.get("SHEEP", 0) < self.p["led_sheep0"] \
                         and have.get("COW", 0) >= 1 \
-                        and n_animals_turn < 2:      # per-turn bundle cap (see below)
-                    _top_grain(bridge * max(1, placed_mouths))
-                    if grain < bridge * max(1, placed_mouths) or money < sheep_cost:
+                        and n_animals_turn < 2 \
+                        and money - sheep_cost >= _stage2_floor:      # per-turn bundle cap (see below)
+                    _top_grain(bridge * grain_mouths)
+                    if grain < bridge * grain_mouths or money < sheep_cost:
                         break
                     d0.append(["BUY_ANIMAL", "SHEEP", 1])
                     money -= sheep_cost
@@ -3178,7 +4487,7 @@ class Policy:
                     have["SHEEP"] = have.get("SHEEP", 0) + 1
                     mouths += 1
                     n_animals_turn += 1
-                    _top_grain(bridge * max(1, placed_mouths))
+                    _top_grain(bridge * grain_mouths)
 
         # -- elite capital reservation (the smoke-caught failure). The script's UNSETTLED
         # remainder is invisible to the seed sizing below: t0 emitted cow+grain, the seed
@@ -3191,7 +4500,16 @@ class Policy:
         # remainder that is unsettled AND NOT EMITTED HERE -- otherwise t0's seed budget
         # goes to zero (reserve = whole bank again) and the farm plants nothing.
         elite_reserve = 0.0
-        if self.p["elite_script"] and day <= 1:
+        # 0925f smoke finding (judge 886, flock_arm=1): the whole-flock netting fired at
+        # t0 -- before stage 2 ever had a chance to spend its share -- so the day-0 seed
+        # round was pushed to the seed_floor ($300) and the melon wave fell $17.4k ->
+        # $3.3k. The wave IS the default arm's mid-game economy; the elite arm gets away
+        # with it only because the majkel_skeleton wave is smaller. flock_stage2_mode
+        # picks the coexistence form (see the stage-2 block): mode 1 reserves stage 1
+        # only (the owe below prices cow0+grain; stage 2 re-fires on settlement within
+        # the day<=1 FSM window), mode 2 keeps the whole-flock owe. The bridge floor
+        # below is unconditional either way, so no mouth is ever admitted unfed.
+        if (self.p["elite_script"] or self.p.get("led_flock", False)) and day <= 1:
             have0 = self._placed_counts(me)
             for sp in ("COW", "SHEEP", "GOOSE"):
                 have0[sp] = have0.get(sp, 0) + int(shed.get(sp, 0) or 0)
@@ -3206,12 +4524,18 @@ class Policy:
             owe += max(0, self.p["led_wheat0"] - int(shed.get("WHEAT", 0) or 0)
                        - emitted_wheat) * prices.get("WHEAT", _base("WHEAT"))
             elite_reserve = min(owe, max(0.0, money))
+        if _flock_stage1_only:
+            self.p["led_cow2"], self.p["led_sheep0"] = _stage2_owe_save
         # Plus the feed bridge: grain to cover every owned-or-scripted mouth until field
-        # wheat lands (~d4 at the earliest; 6 days is safe). Without this the script's
-        # animals starve on a technically "settled" script.
+        # wheat lands. The bridge is sized on the SCRIPT herd (not just placed mouths):
+        # all 5 animals place by d3-4 and eat from d4, while the field's first wheat
+        # harvest lands ~d5 -- measured seed 0: a placed-only bridge (4 units) was eaten
+        # by d2, the lump gate could not afford the refill, and the drip financed a $25-
+        # a-day deficit until the cows died at d7. `feed_bridge` covers the mouths from
+        # first-feed day to field harvest (6 days x 5 mouths = 30 units ~= $750).
         if self.p["elite_script"] and day <= 1:
-            # Placed mouths only (see the script block): shed animals do not eat yet.
-            mouths_now = max(1, sum(self._placed_counts(me).values()))
+            script_herd = (self.p["led_cow0"] + self.p["led_cow2"] + self.p["led_sheep0"])
+            mouths_now = max(sum(self._placed_counts(me).values()), script_herd if day == 0 else 0)
             owe_bridge = max(0, mouths_now * self.p["feed_bridge"]
                              - int(shed.get("WHEAT", 0) or 0)) \
                 * prices.get("WHEAT", _base("WHEAT"))
@@ -3245,17 +4569,46 @@ class Policy:
                                   self.p["seed_floor"]))
         else:
             seed_budget = money - opening_wage_reserve
+        # seed_opening_cap (majkel_skeleton): the census opening floats ~$800 after the
+        # t1-t2 bundle; a full-mix d0 round front-loads ~$1.3k of strawberry seed and the
+        # bank hits $2 by d1 -- no first HIRE, no hands, no structures, 22 days at $0.
+        so = self.p.get("seed_opening_cap", 0)
+        if so and day == 0:
+            seed_budget = min(seed_budget, so)
+        # -- Solvency governor (grind 0924, audit seeds 2/3/4). Past the opening window the
+        # dawn program spends a FIXED appetite (54 berry seeds + quadrants + hires + herd
+        # + grain) while its funding -- the d10-11 melon wave -- varies 3x with the shared
+        # pot draw ($17k on 0/1 vs $9.4k on 2). Program > wave -> bank $0 by d13-16 and the
+        # farm cannot so much as water for 15 turns. The cap keeps `solvency_floor` OUT of
+        # the program: scale the budget first, then drain each site's spend from the
+        # program allowance while it lasts; the floor itself is spendable afterward by the
+        # normal afford checks (feed KEEP: mouths must eat -- starve-proof by design).
+        # grind 0924d: the program-cap family is RETIRED (4 measured variants, all negative
+        # -- a capped program caps its own future income and the bank pins to the floor).
+        # What survives is the narrow per-purchase feed-solvency gate at the animal site
+        # below: never buy a mouth whose 6-day grain cannot be paid for afterward.
+        if self.p.get("solvency_floor", 0) and not getattr(self, "wave_trip", False):
+            self.wave_trip = False      # legacy knob: force-inert when tripped without a cap
         seed = self._seed_orders(seeds, prices, max(0.0, seed_budget),
                                  self.p["seed_slots"])
         seed_cost = sum(o[2] * OBJECT_TABLE[o[1]]["seed_cost"] for o in seed)
         sell = self._sell_orders(shed, minv, prices, (obs.get("private") or {}).get("inventories"),
-                                 day, unlocked=unlocked)
+                                 day, unlocked=unlocked,
+                                 tiles=(me.get("tiles") or []))
 
         # Hiring, early in the day only -- a hand hired at noon gets half a shift for the same
         # money. `hires_today` comes from the observation, so a hire that failed for lack of
         # cash, or one deferred by the slot cap, is simply re-attempted next turn.
         hire = []
-        if hour <= self.p["hire_hours"]:
+        # hire_hours_late (majkel_skeleton): with led_roster_floor the fib cash gate defers
+        # hires until cash recovers -- inside hour 4 they often strand for the whole day and
+        # the roster floor never materializes. The late window keeps re-attempting to hour 10
+        # while a floor is configured and still unfilled; without a floor the day is short.
+        hire_until = self.p["hire_hours"]
+        if (self.p.get("led_roster_floor", 0)
+                and (self.n_hire or 0) > me.get("hires_today", 0)):
+            hire_until = max(hire_until, self.p["hire_hours_late"])
+        if hour <= hire_until:
             slots = max(2, MAX_MARKET_ORDERS - len(seed) - min(len(sell), 3) - 1)
             done = me.get("hires_today", 0)
             cash = money - seed_cost
@@ -3282,6 +4635,12 @@ class Policy:
         # shed dry at d4 and both cows escaped by d6.
         if self.p["elite_script"] and day <= 1 and elite_reserve > 0:
             n_fert = 0
+        # Opening fert hold (majkel_skeleton, smoke seed 0): the census buys ZERO fertilizer
+        # before d6 -- its $300 (d2-3) bought while the herd starved is three days of feed.
+        # No fert until the herd is placed AND shed grain covers two days of mouths.
+        if (self.p["elite_script"] and day <= 5
+                and sum(self._placed_counts(me).values()) < self.p["led_cow0"] + self.p["led_cow2"] + self.p["led_sheep0"]):
+            n_fert = 0
         if n_fert > 0:
             out.append(["BUY_PRODUCT", "FERTILIZER", n_fert])
             money -= sum(price_for("FERTILIZER", max(0, minv.get("FERTILIZER", I0) - k - 1))
@@ -3302,10 +4661,31 @@ class Policy:
             # from $87k to $14k). Keyed per species now: the elite portfolio buys COW
             # and SHEEP the same day without re-arming each other's refire guard.
             sp = a["animal"]
-            if sp not in self.ordered and money >= OBJECT_TABLE[sp]["buy_cost"]:
-                out.append(["BUY_ANIMAL", sp, 1])
-                money -= OBJECT_TABLE[sp]["buy_cost"]
-                self.ordered[sp] = 1
+            # Quantity orders (census: BUY_ANIMAL SHEEP 3): the dawn plan emits n_buy
+            # ONCE per day; hardcoding 1 threw away the rest of the ramp (judge bought
+            # 18 animals vs our 5 through the same gates). Cap by what the bank affords.
+            n_q = max(1, int(a.get("n_buy", 1) or 1))
+            if sp not in self.ordered:
+                cost = OBJECT_TABLE[sp]["buy_cost"]
+                afford = int(money // cost)
+                # Feed-solvency gate (grind 0924d, the narrow survivor): the death mode is
+                # not the cohort spend, it is the LAST purchase -- 3 cows bought at d13 with
+                # $2,640 while the shed held no grain, all three starved, $2,400 -> $0.
+                # After this buy, the cash left must cover every mouth's 6-day grain deficit
+                # (the same bridge the lump wheat buy sizes). Fires only at near-zero banks;
+                # a healthy farm buys animals with $5k+ and 6x mouths ~= $500-750 passes.
+                if afford >= 1 and self.p.get("feed_solvency", 1):
+                    m0 = (a.get("live", 0) + a.get("held", 0) + a.get("n_buy", 0)
+                          + a.get("n_build", 0) + n_q)
+                    px_w0 = price_for("WHEAT", minv.get("WHEAT", I0))
+                    feed_owe = m0 * 6 - shed.get("WHEAT", 0)
+                    if feed_owe > 0 and money - n_q * cost < feed_owe * px_w0:
+                        afford = 0
+                n_q = max(1, min(n_q, afford)) if afford >= 1 else 0
+                if n_q:
+                    out.append(["BUY_ANIMAL", sp, n_q])
+                    money -= n_q * cost
+                    self.ordered[sp] = 1   # retry tomorrow if afford==0 left it unset
         # Feed of last resort. WHEAT is one of the two goods the engine will sell back, and an
         # animal two days unfed is gone for good along with the rest of its season, so a farm
         # whose own wheat has run down buys the grain rather than lose the asset. Sized against
@@ -3327,8 +4707,27 @@ class Policy:
         # cow placed day 13, shed wheat 0 on days 11-13, escaped day 16). Six days per mouth
         # rides through the order-cap days and the price spikes without ever starving.
         need = mouths * 6 - shed.get("WHEAT", 0) if mouths else 0
-        if need > 0 and "wheat" not in self.ordered and day < SEASON_DAYS - 1 \
-                and money >= need * price_for("WHEAT", minv.get("WHEAT", I0)) \
+        # Drip mode (majkel_skeleton, smoke seed 0): the lump-sum gate (`money >= need*px`)
+        # deadlocks a poor opening -- need=30 units x $25 = $750 against a $36 bank means
+        # NO grain is ever bought, and the herd starves the day after placement (d5-7
+        # escape, seat 0). The census drip-buys 1-2 WHEAT nearly every turn through d1-d2;
+        # the live-shed sizing below is self-limiting (need shrinks as orders settle), so
+        # a small per-turn drip is safe to repeat where the dawn snapshot was not.
+        drip = (self.p["elite_script"] and mouths > 0
+                and shed.get("WHEAT", 0) < mouths * 2
+                and money < need * price_for("WHEAT", minv.get("WHEAT", I0)))
+        # The lump buy must respect the opening float too -- measured on seed 0 it fired
+        # at d0-dawn (30 units = $750) and the float never survived to fund the roster's
+        # wages through the pre-harvest dead zone (bank $3 by d5, herd starving d7).
+        fl_now = self.p.get("opening_float", 0) if day <= 2 else 0
+        if drip:
+            n_w = min(need, 2, int(money // px_w if (px_w := prices.get("WHEAT", _base("WHEAT"))) > 0 else 0))
+            if n_w > 0 and sum(shed.values()) < SHED_CAPACITY and day < SEASON_DAYS - 1:
+                out.append(["BUY_PRODUCT", "WHEAT", n_w])
+                money -= n_w * prices.get("WHEAT", _base("WHEAT"))
+                self.ordered["wheat"] = n_w
+        elif need > 0 and "wheat" not in self.ordered and day < SEASON_DAYS - 1 \
+                and money - fl_now >= need * price_for("WHEAT", minv.get("WHEAT", I0)) \
                 and sum(shed.values()) < SHED_CAPACITY:
             # The shed-room condition mirrors the real engine's refusal: a BUY_PRODUCT into
             # a full shed is dropped uncharged (see engine.py's mirror of `_commit_unit`).
@@ -3339,8 +4738,11 @@ class Policy:
         # Only when the allocator actually ran out of tiles, and only while a bought quadrant
         # still has time to return the money: the shortest cycle is carrot at four days, and a
         # quadrant bought after that cannot be planted into anything that finishes.
+        _lc = int(self.p.get("land_cap_quads", 0) or 0)
         if nxt and self.tile_limited and day + CROP_PLAN["CARROT"]["harvest_day"] < SEASON_DAYS \
-                and not (self.p["elite_script"] and day <= 1 and elite_reserve > 0):
+                and not (self.p["elite_script"] and day <= 1 and elite_reserve > 0) \
+                and (not _lc or len(unlocked) < _lc) \
+                and (nxt != "SE" or day <= int(self.p.get("se_last_day", 99) or 99)):
             if money >= LAND_PRICES[nxt] * self.p["land_margin"]:
                 out.append(["BUY_LAND"])
                 money -= LAND_PRICES[nxt]
@@ -3396,7 +4798,31 @@ class Policy:
             money -= n * cost
         return out
 
-    def _sell_orders(self, shed, minv, prices, invs=None, day=0, unlocked=None):
+    def _base_equiv_value(self, prices):
+        """Season-scale denominator for the endgame_shift gap test, in base dollars.
+
+        Board area x the average base price of the goods the board actually carries --
+        ~75 tiles x ~$100 avg base = ~$7,500, so the 10% gap floor is ~$750: a real
+        lead, not market noise. Static (base prices only) so it cannot be gamed by the
+        very market swing it is trying to see through.
+        """
+        vals = [m["base"] for m in MARKET_PARAMS.values() if m.get("base")]
+        avg_base = sum(vals) / len(vals) if vals else 0.0
+        return BOARD_SIZE * BOARD_SIZE * avg_base
+
+    def _effective_endgame(self):
+        """The day the full-clear sell regime starts, honoring endgame_shift.
+
+        Shipped form: `SEASON_DAYS - endgame_days`. The shift moves it one day earlier
+        only when `_market_orders`' public-money read fired (it then holds for the rest
+        of the episode); `None` (never fired, or reset at a new episode's dawn) means a
+        leading/tied game keeps the metered regime byte-identical.
+        """
+        val = self.__dict__.get("eff_endgame")
+        return val if isinstance(val, int) else (SEASON_DAYS - self.p["endgame_days"])
+
+    def _sell_orders(self, shed, minv, prices, invs=None, day=0, unlocked=None,
+                     tiles=None):
         """Sell orders sized against the shed *plus* what the units are still carrying.
 
         contract: units settle SELL from private["shed"] ONLY (`_commit_unit` reads the shed),
@@ -3427,9 +4853,22 @@ class Policy:
         for inv in (invs or []):
             for good, n in (inv or {}).items():
                 carried[good] = carried.get(good, 0) + n
-        endgame = day >= SEASON_DAYS - self.p["endgame_days"]
+        # ELO-first C (endgame_shift): a trailing close starts the full-clear one day
+        # early (the public-money read fired in `_market_orders` and set `eff_endgame`,
+        # shipped start d25 -> d24 with endgame_days=5). A leading/tied game keeps the
+        # shipped form exactly.
+        endgame = day >= self._effective_endgame()
         total = sum(pool.values()) + sum(carried.values())
         crowded = total > self.p["crowded"] * SHED_CAPACITY
+        # 0925b P1 (tick_burst): the pile is re-named from the live shed every turn, so
+        # capping a mid-season sell at a burst and letting the remainder re-offer next
+        # turn lets the deterministic town drains lift the book between bursts (the
+        # price curve is per-unit sequential within one settlement). MELON/always_sell,
+        # the crowded valve, and the endgame full-clear are untouched -- all three carry
+        # measured do-not-meter verdicts (the valve branch and endgame branch below).
+        burst = int(self.p.get("tick_burst", 0) or 0)
+        burstable = bool(burst > 0 and not endgame and not crowded)
+        tiles_ref = tiles if tiles is not None else []
         # Published for `_market_orders`: a crowded shed changes the whole turn's priorities, not
         # just this list. Buying more input into a shed that is already discarding output is the
         # worst trade on the board, and the slot the purchase takes is a slot a sale needed.
@@ -3456,10 +4895,23 @@ class Policy:
             # dawn for 12 days, the buffer gate never opened, and the herd never started. The
             # pasture under construction is a mouth: the supply must survive the sell pass to
             # ever meet it.
+            # grind 0922 TESTED-AND-REVERTED: making this hold unconditional (the crowded
+            # exemption read as the cause of the d22-25 judge herd deaths) plus clamping the
+            # carried margin under a hold regressed the judge mean -$79.7k -> -$90.6k. The
+            # traced deaths are real (shed grain 0 with ten mouths, SELL WHEAT firing at
+            # shed 0-6) but the sell pass cannot tell WHICH grain units a sale settles --
+            # the clamp silently dropped legitimate carried produce too. Revisit as a
+            # settlement-exact fix (sell only pool-hold, never touch bags, plus a
+            # crowd-proof BUY_PRODUCT lane), gated on the judge panel.
             mouths = (self.animals["live"] + self.animals["held"] + self.animals["n_buy"]
                       + self.animals.get("n_build", 0))
             if mouths:
-                hold["WHEAT"] = self.p["feed_hold"] * mouths
+                # wheat_drip (0925n): 0 = shipped feed_hold; >0 shrinks the mid-season
+                # bridge to this many days/mouth so surplus grain drips daily (the winners'
+                # cadence) instead of parking for 12 days.
+                _bridge = self.p["wheat_drip"] if self.p.get("wheat_drip", 0) > 0 \
+                    else self.p["feed_hold"]
+                hold["WHEAT"] = _bridge * mouths
         # Shed animals are mouths TOO, regardless of the dawn-stale plan. The elite smoke
         # (seed 0) caught the catastrophic form: the d0 script bought 2C+3S across t0-t2,
         # the plan computed at dawn still said mouths=0, and the sell pass sold the whole
@@ -3470,8 +4922,10 @@ class Policy:
         shed_mouths = sum(int(shed.get(sp, 0) or 0)
                           for sp in ("COW", "SHEEP", "GOOSE"))
         if shed_mouths and (not endgame or herd_endgame) and not crowded:
+            _bridge2 = self.p["wheat_drip"] if self.p.get("wheat_drip", 0) > 0 \
+                else self.p["feed_hold"]
             hold["WHEAT"] = max(hold.get("WHEAT", 0),
-                                self.p["feed_hold"] * shed_mouths)
+                                _bridge2 * shed_mouths)
         # Live-herd feed is never inventory. The funnel trace (shepherd8, all seeds): the
         # herd stood stable d17-26, then the ENDGAME sell pass dumped the buffer and an
         # animal starved at d27 with $15 of grain in the shed -- exactly the working-capital
@@ -3480,7 +4934,18 @@ class Policy:
         if (self.p["shepherd_mode"] and self.animals
                 and (self.animals["live"] + self.animals["held"] + shed_mouths) > 0):
             hold["WHEAT"] = max(hold.get("WHEAT", 0),
-                                self.animals["live"] + self.animals["held"] + shed_mouths)        # -- WOOL recovery hold (elite_counter_v1 P2). Wool's pot is tiny and its crash is
+                                self.animals["live"] + self.animals["held"] + shed_mouths)
+        # sell_fert (0924e): the animal BYPRODUCT stream sells as collected, but never
+        # below the crop program's own buffer target (`fert_stock`) -- selling doses the
+        # strawberry program then re-buys is churn, and the buffer is what the fert
+        # jobs route against. Only the surplus beyond the target drains; endgame
+        # liquidation still takes everything.
+        if (self.p.get("sell_fert", 0) and not endgame
+                and self.p.get("fert_stock", 0) > 0):
+            hold["FERTILIZER"] = max(hold.get("FERTILIZER", 0),
+                                     min(int(pool.get("FERTILIZER", 0) or 0),
+                                         int(self.p["fert_stock"])))
+        # -- WOOL recovery hold (elite_counter_v1 P2). Wool's pot is tiny and its crash is
         # the deepest on the board (3.2x per glut unit): the dossier's winners hold crashed
         # wool through the trough -- up to 28 shed units d12-20 -- and sell after recovery
         # at ~$190, while the farm that dumped early sold the same wool for a fraction.
@@ -3493,23 +4958,79 @@ class Policy:
         # dossier converts it to 5-6 cows SAME DAY. Holding it until d12-20 starved the
         # whole farm to $1-27 d6-10 -- no field, no reinvestment, and a cow lost at d14.
         # After d12 the trough is real (both herds saturate wool), so the hold starts.
-        if (self.p["elite_script"] and day >= 12 and not endgame and not crowded):
+        if ((self.p["elite_script"] or self.p["wool_lane"] > 0)
+                and day >= 12 and not endgame and not crowded):
             wool_shed = int(pool.get("WOOL", 0) or 0)
             if (0 < wool_shed < self.p["wool_hold_cap"]
                     and prices.get("WOOL", _base("WOOL")) < self.p["wool_hold_price"]):
                 hold["WOOL"] = wool_shed
+        # -- MILK first-mover window (grind 0922 P3; the 907 judge leak). The dossier's
+        # law: milk pays $230-246 to the herd that sells d13-19 and $38-63 once BOTH
+        # herds saturate -- and farms are public, so the rival's cow count is known
+        # before the glut lands. Hold shed milk only when the glut is genuinely near: a
+        # rival herd at glut scale AND a live price that has rolled off the season peak.
+        # A fresh high means the window is still open (sell into strength, his exact
+        # pattern); a small rival herd means the drip stays. Released naturally by
+        # recovery (price back above the frac x peak) or by endgame liquidation. Never
+        # in a crowded shed: overflow beats recovery.
+        # NOTE (P2b clamp, tested and reverted): a held good's carried margin still
+        # names same-turn DROPs, so a small tail of held goods can settle from the
+        # shed anyway. Milk drip volume keeps this negligible; the bag-map fix is a
+        # P5 tuner item.
+        if ((self.p["elite_script"] or self.p["milk_window_def"])
+                and self.p["milk_window"] and not endgame
+                and not crowded and day >= self.p["milk_window_start"]
+                and self.opp_census.get("COW", 0) >= self.p["milk_opp_glut"]):
+            milk_shed = int(pool.get("MILK", 0) or 0)
+            _peak = self.px_peak.get("MILK", 0.0)
+            _live = prices.get("MILK", _base("MILK"))
+            if (0 < milk_shed <= self.p["milk_hold_cap"] and _peak > 0.0
+                    and _live < self.p["milk_hold_frac"] * _peak):
+                hold["MILK"] = milk_shed
         out = []
         for good in sorted(set(pool) | set(carried), key=lambda g: -prices.get(g, 0)):
             if good not in MARKET_PARAMS:
                 continue
-            if good in _INPUTS and not endgame:
+            # sell_fert (0924e): fertilizer sells ONLY as the crowded-shed relief valve.
+            # Continuous selling measured mean -1.2k on the mirror: on comfortable days a
+            # fert SELL slot ($25-60) displaces a strawberry slot ($110), while the shed
+            # crowding it relieved never materialized. But when the shed DOES crowd, fert
+            # is the cheapest thing in it -- the valve selling it first protects the
+            # expensive units from midnight destruction (s4 +8.7k came from exactly this).
+            # 0924g fert drip: at GOOD prices fert is revenue, not storage -- but only
+            # when the rival's herd is real (opp_fert_demand): a passive twin gives the
+            # drip no buyer and it costs slot displacement (-$2.9k verified pack), a
+            # Majkel-class herd sustains the shared fert book and it pays +$4.0k mean
+            # on the 5-judge panel. The valve (crowded) stays for the crash/overflow
+            # case; a shed-wheat feed guard was tested and REVERTED (byte-inert on all
+            # five judges with real-sized herds, still cost mirror s2/s3). Watch-item:
+            # mirror unfed-days rose 51->63 under the drip; that cost is priced into
+            # the judge bank results.
+            _opp_herd = sum(int(v or 0) for v in getattr(self, "opp_census", {}).values())
+            _fert_drip = (good == "FERTILIZER" and self.p.get("sell_fert", 0)
+                          and not endgame and not crowded
+                          and self.p.get("fert_drip_px", 0) > 0
+                          and prices.get("FERTILIZER", 0)
+                              >= self.p["fert_drip_px"] * _base("FERTILIZER")
+                          and _opp_herd >= int(self.p.get("opp_fert_demand", 5) or 5))
+            if good in _INPUTS and not endgame \
+                    and (not self.p.get("sell_fert", 0) or not crowded) \
+                    and not _fert_drip:
                 continue
             # Shed-backed stock plus the carried margin (engine skips unfunded tail units).
             # A carried-ONLY good is still named: a same-turn DROP lands it in the shed
             # before settlement, so the order is free upside either way.
             have = pool.get(good, 0) - hold.get(good, 0) + carried.get(good, 0)
-            if have <= 0:
-                continue
+            # grind 0922 P2b (clamp variant TESTED AND REVERTED same session): clamping
+            # carried margin on held goods (the "settlement-exact" narrow form) cost the
+            # mirror $62-66k -> $19.8-50.1k. The carried margin names two things that
+            # settlement cannot distinguish: same-turn DROPs (legitimate -- the unit
+            # lands the bag in the shed BEFORE the SELL settles) and slow-walker bags
+            # (the theft tail that reached into the herd's held grain on the 900 world).
+            # Killing the first costs more than the second: wheat is the constant drip
+            # economy and every same-turn sale became a next-day sale. Left as shipped;
+            # the real fix is a bag-tracking map (which carried units reach the shed
+            # this turn), a P5 tuner item.
             # Days of town drain a capped sell names. The unlocked shop list is threaded in
             # by `_market_orders` from the observation, so `drain_per_day_from_shops` is
             # exact on the ladder; an empty list falls back to town-centre-only, which
@@ -3533,7 +5054,24 @@ class Policy:
                 # exposed to midnight overflow in between (lost 33 -> 41, mean -$5.5k).
                 # The winners never hold this stock because their PRODUCTION is drip-
                 # sized (continuous replanting), not because their sell is capped.
-                if day >= SEASON_DAYS - 1 or good in self.p["always_sell"] \
+                # 0925g endgame_floor: the full-clear's own DEPTH has a failure mode of
+                # its own (112960536: 560 strawberry at $1 average). Pause a collapsed-
+                # price good for the day -- only mid-season (d29 clears; overflow risk
+                # still dominates on the last day), never for always_sell (MELON's tail
+                # units still score -- cohort capped at source means the clear IS the
+                # drain, and a paused melon just rots). The pause is per-dawn natural:
+                # the loop re-reads prices every turn, so recovery inside a day resumes
+                # the clear without state.
+                _ef_frac = self.p.get("endgame_floor", 0)
+                _ef_pause = False
+                if (_ef_frac and day < SEASON_DAYS - 1
+                        and good not in self.p["always_sell"]):
+                    _pk = self.px_peak.get(good, 0.0)
+                    _live = prices.get(good, _base(good))
+                    _ef_pause = (_pk > 0.0 and _live < _ef_frac * _pk)
+                if _ef_pause:
+                    n = 0
+                elif day >= SEASON_DAYS - 1 or good in self.p["always_sell"] \
                         or self.p["endgame_cap"] <= 0:
                     n = have                       # final day: nothing scores after this
                 else:
@@ -3553,19 +5091,48 @@ class Policy:
                 if good in self.p["always_sell"]:
                     n = have
                 else:
+                    # grind 0922: the unconditional feed hold pins the grain out of the
+                    # sellable pile, so wheat no longer relieves a crowded shed and the
+                    # emergency regime can persist for days. With the valve open (the
+                    # HOLD-ADJUSTED pile really is overflowing), produce sells at ANY
+                    # price -- the floor exists to stop a dump-and-rebuy churn, and a
+                    # farm that refuses $30 strawberries while crowded freezes its bank
+                    # (seed-5 probe: strawberry 0 named, $3.8k season). Storage risk
+                    # beats price recovery once overflow is live, which is this
+                    # branch's own contract.
                     n, mi = 0, minv.get(good, 0)
                     floor = self.p["crowd_floor_frac"] * self.p["reserve"] * _base(good)
+                    # 0925b P2 (crowd_premium_floor): the valve exists because a refusing
+                    # farm freezes its bank -- but overflow discards INCOMING bags at
+                    # midnight, not shed stock, so premium units already safe in the shed
+                    # can be stranded at the NORMAL reserve floor while staples and inputs
+                    # absorb the relief (this branch's own contract). MELON is always_sell
+                    # and never reaches here; endgame (the real fire-sale) is another regime.
+                    if (self.p.get("crowd_premium_floor", 0)
+                            and good in _PREMIUM_HOLD_GOODS):
+                        floor = self.p["reserve"] * _base(good)
                     while n < have and n < lim and price_for(good, mi) >= floor:
                         n += 1
                         mi += 1
             else:
                 n, mi = 0, minv.get(good, 0)
                 floor = self.p["reserve"] * _base(good)
-                # Elite wool window (P2, smoke): past d12 the trough is real, so WOOL's
-                # reserve floor drops to the recovery floor -- the trough price is $40-80
-                # and the 0.9x reserve floor parks every pop in the shed for weeks.
-                if (self.p["elite_script"] and good == "WOOL"
-                        and 12 <= day < SEASON_DAYS - self.p["endgame_days"]):
+                # Milk's dedicated floor (dossier adoption): the steepest crash curve on
+                # the board -- 8 units of net oversupply break the 90% mark -- means a
+                # generic floor strands drips that crater anyway. Deeper floor = sell
+                # through the slide; the first-mover window hold above still governs
+                # WHEN the drip pauses, this only governs how deep it reaches.
+                if good == "MILK" and self.p.get("milk_floor_frac", 0) > 0:
+                    floor = min(floor, self.p["milk_floor_frac"] * _base("MILK"))
+                if good == "FERTILIZER" and self.p.get("sell_fert", 0):
+                    floor = min(floor, self.p.get("fert_floor_frac", 0.25) * _base("FERTILIZER"))
+                # Elite wool window (P2, smoke): the 0.9-1.1x reserve floor applies ALL
+                # season and the trough-hold (above) handles d12+ -- before d12 the low
+                # floor is the FIRST-MOVER window: the census converts the d6 pop (~$90
+                # price, floor would be $220) into 5-6 cows SAME DAY; parking it behind a
+                # $220 floor until the herd-saturated trough starved the whole farm
+                # (bank $1-27 d6-10, cow lost d14).
+                if (self.p["elite_script"] or self.p["wool_lane"] > 0) and good == "WOOL":
                     floor = self.p["wool_floor"] * _base("WOOL")
                 # Blend in the monitor's measured curve when it is seeded. In-mirror the
                 # projection reproduces the static floor's arithmetic, so this only bites
@@ -3579,6 +5146,20 @@ class Policy:
                 while n < have and price_for(good, mi) >= floor:
                     n += 1
                     mi += 1
+                # -- 0925b P4 (marginal_sell): price the pile against the head it will
+                # meet at the END of the sell window, not the static floor (see
+                # `_marginal_hold`). Falling market -> sell through; rising market ->
+                # hold. Endgame/crowded/always_sell never reach here, and MILK/WOOL
+                # keep their dedicated windows (the floor shifts above are the only
+                # paths those goods had here).
+                if (int(self.p.get("marginal_sell", 0) or 0) and n > 0
+                        and _marginal_hold(good, n, mi, tiles_ref, day,
+                                           self.p["marginal_horizon"], unlocked)):
+                    n = 0
+            # -- 0925b P1 (tick_burst) AFTER P4's recompute: the remaining pile stays
+            # in the shed and re-offers next turn at the (drain-lifted) book.
+            if burstable and good not in self.p["always_sell"] and n > burst:
+                n = burst
             if n > 0:
                 out.append(["SELL", good, n])
         return out

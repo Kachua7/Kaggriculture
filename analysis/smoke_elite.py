@@ -21,8 +21,12 @@ def run(seed, arm):
     # Reset knobs first: PARAMS.update from a previous run() call in the same process
     # would otherwise poison the baseline arm (both arms reported identical banks).
     P.PARAMS.update({"opening_led": False, "elite_script": False, "melon_opening": 24})
+    P.PARAMS.update({"led_roster_floor": 0, "land_early": False})
     if arm == "elite":
         P.PARAMS.update({"opening_led": True, "elite_script": True, "melon_opening": 0})
+    elif arm == "skeleton":
+        from kagfarm.constants import majkel_skeleton
+        P.PARAMS.update(majkel_skeleton())
     main._POLICIES.clear()
     env = KaggricultureEnv(episode_steps=720, seed=seed)
     obs = env._obs()
@@ -58,7 +62,7 @@ def run(seed, arm):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--arm", choices=["elite", "baseline"], default="elite")
+    ap.add_argument("--arm", choices=["elite", "baseline", "skeleton"], default="elite")
     a = ap.parse_args()
     d0, herd, money, bank = run(a.seed, a.arm)
     print(f"== arm={a.arm} seed={a.seed} ==")
