@@ -1,258 +1,178 @@
-<div align="center">
+# 🌾 kagfarm — a competitive agent for Kaggle's Kaggriculture
 
-# 🌾 kagfarm
+An autonomous agent that plays a two-player farming economy game, plus the evaluation
+infrastructure I built to find out, honestly, whether each change made it better.
 
-### A competitive autonomous agent for Kaggle's Kaggriculture simulation
-
-[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+<!-- Add once a workflow exists: ![CI](https://github.com/Kachua7/Kaggriculture/actions/workflows/ci.yml/badge.svg) -->
+![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 [![Kaggle](https://img.shields.io/badge/Kaggle-Kaggriculture-20BEFF?style=flat-square)](https://www.kaggle.com/competitions/kaggriculture)
-[![Tests](https://img.shields.io/badge/Tests-226%20passing-2ea44f?style=flat-square)](#-testing)
-[![Engine](https://img.shields.io/badge/Real--engine-1.32.7%20vendored-6f42c1?style=flat-square)](#-measurement-and-experimentation)
 
-**Observe → Model → Decide → Schedule → Execute → Measure → Improve**
+<!-- TODO (delete this comment when done): add a screenshot or GIF of a match here, e.g.
+![A sample match](docs/match.gif) -->
 
-</div>
+## In one paragraph
 
----
+In Kaggriculture, two agents each run a farm for a 30-day season (720 turns): planting
+crops, raising livestock, hiring workers, expanding land and trading on a **market they
+share**. The agent holding more coins at the end wins. Every action costs time, and the
+rival's production moves the same prices you sell into. `kagfarm` is my agent for it. It
+observes the game, models the opponent, picks a strategy, schedules workers, and packs
+its market orders under a hard slot limit. Around it I built a local rules engine, a
+bridge to the real competition engine, ~78 experiment scripts, a 226-test suite, and a
+written ledger of every experiment, including the ones that failed.
 
-## What is this?
+<!-- TODO: add one headline result in plain words, e.g.
+"Reached rank N / Elo X on the public ladder after 31 submissions." -->
 
-Kaggriculture is a two-player farming simulation on Kaggle: over a 30-day season
-(720 turns) each agent manages crops, livestock, hired farm hands, land expansion
-and market orders under a **dynamic shared market** — and the winner is whoever
-holds more coins at terminal. Every action costs time and movement, the opponent's
-production moves the same prices you sell into, and animals you can't service
-escape and die.
+## Results
 
-This repository is my agent for it — `kagfarm` — plus everything built around it:
-a local reimplementation of the rules, an evaluation bridge into the vendored
-competition engine, ~78 experiment harnesses, a 226-test suite, and a measurement
-ledger ([calibration/live.md](calibration/live.md)) where every experiment —
-including the regressions — is recorded.
+All numbers below come from the repository's own evaluation against the real competition
+engine (v1.32.7) with a fixed random seed. They measure **wins and losses against
+specific opponent agents**, not the official leaderboard.
 
-> The interesting part isn't the farm. It's the control problem:
-> **short-term survival vs. long-horizon economic value, against an adaptive
-> rival in a shared market.**
+**Latest shipped build, by opponent tier**
 
-<p align="center">
-  <img src="docs/architecture.svg" alt="kagfarm decision pipeline" width="720"/>
-</p>
+| Opponent tier        | Wins–Losses | Mean margin (coins) | Note                                      |
+| -------------------- | ----------- | ------------------- | ----------------------------------------- |
+| Elite (3 opponents)  | 0–3         | −80,941             | Smallest losses I've recorded on this tier |
+| Famine (2)           | 2–0         | +45,256             | Best result so far                        |
+| Midfield (4)         | 4–0         | +24,260             |                                           |
+| Wall (7)             | 2–5         | −12,670             | Up from 1–6 after the scheduler fix       |
 
----
+**Public ladder sample (25 episodes):** 14 wins, 11 losses, mean margin +4,521.
+Against lower-rated opponents (below 540 Elo) it went 13–2 with a mean margin of +26k.
+Against higher-rated ones (above 600) it went 0–5 with a mean margin of −40k. I traced
+that ceiling, episode by episode, to the herd-service collapses described in
+[What I'd do next](#what-id-do-next).
 
-## Architecture
+I treat **win/loss as the promotion metric and margin only as a tiebreaker**. Margin
+can look like progress when it isn't (see [Measurement](#measurement)).
 
-The agent is organized around one canonical state representation and a layered
-decision pipeline:
+## How the agent decides
 
-```text
+One shared picture of the game state feeds a layered decision pipeline:
+
+```
 Observation
     ↓
-WorldState ──────────── one snapshot: cash, roster, positions, shed,
-    │                  market, FutureSupply[g][t], ServiceLoad[t], slack
+WorldState ──────────── one snapshot: cash, workers, positions, shed, market,
+    │                   forecast supply, service load, slack
     ↓
-Opponent inference ──── behavioral phenotype posterior from public state
-    ↓                  (MILK/WOOL p10 / p50 / p90 arrival waves)
-Strategy zoo ────────── E0–E8, each a parameter overlay on one executor
+Opponent inference ──── estimates the rival's behavior type from public state
     ↓
-Runtime selector ────── commits one expert per macro window
-    │                  (d0/3/6/9/12/16/20/24) + danger-trigger overrides
+Strategy zoo ────────── nine parameter sets (E0–E8) over one executor
     ↓
-Task planner ────────── portfolio: plant, buy, feed, expand, sell
+Runtime selector ────── commits one strategy per time window, with
+    │                   emergency overrides for danger signals
     ↓
-Worker scheduler ────── serpentine allocation → deferred jobs →
-    ↓                  global reassignment (cheapest marginal walk)
-Market-slot optimizer ─ max Σ ΔV·x  s.t.  Σ slots ≤ 10, sells floored
+Task planner ────────── plant, buy, feed, expand, sell
+    ↓
+Worker scheduler ────── assigns jobs to minimize walking
+    ↓
+Market-slot optimizer ─ best orders under a 10-slot-per-turn limit
     ↓
 Deterministic executor
 ```
 
-### Core ideas
+![kagfarm decision pipeline](docs/architecture.svg)
 
-**1. Canonical world state.** Subsystems don't each reinterpret the raw
-observation. Crops, animals, the opponent's acreage, service capacity and market
-pressure are projected into one shared forecast object — because the failure mode
-I kept hitting was *two planners quietly disagreeing about the same state*. The
-clearest example: the market's supply model and the allocator's supply model used
-the same pipeline function with different arrival-weighting, and the inconsistency
-survived two submission cycles before the shared-state rewrite exposed it.
+### Five ideas that mattered
 
-**2. Runtime strategy selection.** The agent doesn't commit to one strategy.
-A zoo of nine parameter overlays (E0 elite prior … E7 anti-livestock, E8
-liquidity) is scored at macro decision points, and the winner is committed for a
-window — unless a danger trigger (service deficit, herd-collapse risk, price
-shock) fires mid-window.
+1. **One shared world state.** Planners that each interpreted the raw observation
+   quietly disagreed with each other. The market model and the allocator used the same
+   function with different weighting, and the mismatch survived two submissions before a
+   shared-state rewrite exposed it. Now every subsystem reads one forecast object.
+2. **Strategy selection at runtime.** Instead of committing to one strategy, the agent
+   scores nine at decision points and commits to the winner for a window, unless a danger
+   trigger (service deficit, herd-collapse risk, price shock) fires first.
+3. **The opponent as a market force.** I can't control the rival, but their herd moves
+   the shared price. The agent estimates their behavior type and prices its own livestock
+   decisions partly on their expected milk and wool output.
+4. **Worker scheduling as optimization.** Every turn spent walking is a turn not
+   producing. A global reassignment pass hands deferred jobs to whichever worker has the
+   cheapest extra walk. This one change turned a lost matchup (−$22,109) into a win
+   (+$12,749) without touching strategy.
+5. **Market slots as a constrained problem.** Ten order slots per turn are shared between
+   buys and sells. The agent re-packs discretionary orders by value per slot, while
+   survival orders (hiring, land) always keep priority.
 
-**3. Opponent modelling as market externality.** The rival isn't controlled, but
-their herd moves the shared market. The agent maintains a behavioral-phenotype
-posterior and prices own-livestock decisions partly on *their* expected milk/wool
-arrival waves — because in a shared market, sometimes the best move changes what
-the opponent's production is worth.
+## Measurement
 
-**4. Worker scheduling as a real optimization.** Every turn spent walking is a
-turn not producing. The scheduler runs serpentine allocation with set-aside and
-continue, then a global reassignment pass that hands deferred jobs to the unit
-with the cheapest marginal walk. This one mechanism recovered a lost matchup
-(−$22,109 → +$12,749) without touching strategy.
+Tooling is the main deliverable here. Every new mechanism ships behind a flag, stays off
+until a real-engine battery shows it helps, and gets a row in the
+[ledger](calibration/live.md) whatever the outcome. Two results shaped how I work:
 
-**5. Market slots as constrained optimization.** Ten order slots per turn,
-shared between buys and sells, under cash and inventory feasibility. The agent
-re-packs discretionary orders by marginal value per slot rather than walking a
-fixed priority ladder — survival orders (hire, land) stay constitutional.
+- **A "catastrophic −$115,914 regression" was a measurement bug.** The flag under test
+  hit an outdated function call, crashed inside a guard that swallowed the error, and made
+  the agent pass on every action. After fixing the call, the real effect was neutral. I
+  invalidated the ledger row instead of deleting it.
+- **A +38% margin gain changed no win/loss results**, and one opponent tier got worse in
+  the same build. That's why wins and losses, not margin, decide what ships.
 
----
+Reproducibility is built in: the hash seed is pinned (`PYTHONHASHSEED=0`) because a tiny
+change can reroute a 720-turn game, and the packaging step replays 16 reference episodes
+and refuses to ship if they don't check out (`PACK OK 16/16`).
 
-## Measurement and experimentation
-
-The evaluation infrastructure is the project. Every mechanism lives behind a
-flag in `PARAMS`, ships dormant until a real-engine battery promotes it, and
-every verdict lands in the ledger — **W/L is the promotion metric; margin is a
-tiebreaker**. Two findings that justify the discipline:
-
-- **A "catastrophic −$115,914" regression was a measurement artifact.** The flag
-  under test hit a stale 7-argument call, crashed inside a never-raise guard, and
-  cascaded to PASS-everything. After repairing the call, the true mechanism
-  measured W/L-neutral. The ledger row was invalidated, not hidden.
-- **A +38% margin improvement shipped zero W/L change** — and one tier took a
-  real W→L regression in the same build. Margin lies; W/L is the objective.
-
-### Battery of record (sub31 ship state, real engine 1.32.7, `PYTHONHASHSEED=0`)
-
-| Tier | W/L | Mean margin (coins) | Notes |
-| --- | :-: | ---: | --- |
-| Elite (3 judges) | 0–3 | −80,941 | best-ever on this tier |
-| Famine (2) | 2–0 | +45,256 | best-ever |
-| Midfield (4) | 4–0 | +24,260 | |
-| Wall (7) | 2–5 | −12,670 | recovered from 1–6 by the scheduler fix |
-
-### First full strategy-zoo table (six W/L-moving judges)
-
-| Expert | W/L | Mean Δ margin |
-| --- | :-: | ---: |
-| E0 elite prior | 6–0 | +31,259 |
-| E7 anti-livestock | 6–0 | **+33,191** |
-| E8 liquidity | 6–0 | **+32,969** |
-
-E7 beating E0 on margin does **not** promote it — the promotion rule is W/L.
-What it proved is that the state space contains regimes where the elite prior
-leaves value on the table, which is exactly why the runtime selector exists.
-
-### Real-ladder read (sub26, 25 public episodes)
-
-14W–11L, mean +4,521; dominant below 540 Elo (13W–2L, mean +26k), winless above
-600 (0W–5L, mean −40,193) — a ceiling gap traced per-episode to herd service
-collapse, which is what the service-slack machinery now models.
-
-> These are repository-recorded internal evaluations against identified judge
-> seatings, not claims about the official competition leaderboard.
-
----
-
-## Testing
+## Run it
 
 ```bash
-PYTHONHASHSEED=0 .venv/bin/python -m unittest discover -s tests -q
-# Ran 226 tests ... OK
+bash bootstrap.sh                                                     # venv + pinned deps + vendored engine
+PYTHONHASHSEED=0 .venv/bin/python -m unittest discover -s tests -q   # 226 tests
+PYTHONHASHSEED=0 PYTHON="$PWD/.venv/bin/python" SEEDS=8 bash pack.sh # build + validate the submission
 ```
 
-226 unit tests cover the policy contracts: scheduler invariants, service
-survival gating, opponent-supply calendars (including the day-0 placement edge
-case), market-slot feasibility, sell floors under every crowding path, and the
-flag-gated subsystems. The hash seed is pinned because a tiny behavioral change
-can reroute a 720-turn trajectory — reproducibility is part of the measurement.
+Local evaluation runs the agent against the vendored competition engine through
+`bridge/real_env.py`. The scripts in `analysis/` (`judge_bar.py`,
+`paired_harness_real.py`, `zoo_rollout.py`, …) run the batteries.
 
----
+Some Kaggle assets (the engine itself and multi-GB replay datasets) aren't committed.
+`bootstrap.sh` re-vendors the engine and `analysis/restore_replays.py` re-fetches replays.
 
-## Submission pipeline
+## Repository map
 
-```bash
-PYTHONHASHSEED=0 PYTHON="$PWD/.venv/bin/python" SEEDS=8 bash pack.sh
-# PACK OK 16/16 bank-for-bank  →  submission.tar.gz + regenerated submission/main.py
 ```
-
-`bundle.py` produces the single-file build (a pure function of `main.py` +
-`kagfarm/`, re-verified in under a second); `pack.sh` builds the archive and
-validates it bank-for-bank against a 16-episode harness before anything ships.
-Every seated artifact is hashed in the ledger, with a rollback chain kept on disk.
-
----
-
-## Repository structure
-
-```text
-.
-├── main.py                  competition entrypoint
-├── kagfarm/
-│   ├── policy.py            the agent: WorldState, zoo, selector, market/service planners
-│   ├── route.py             worker scheduling (serpentine + deferred + reassignment)
-│   ├── constants.py         object/crop/market tables, promotion-flag defaults
-│   └── opening_book*.json   precomputed opening chains (shipped prior)
-├── engine.py                local reimplementation of the competition rules
-├── eval.py / sweep.py       local evaluation and parameter sweeps
-├── bridge/real_env.py       evaluation through the vendored real engine (1.32.7)
-├── analysis/                ~78 experiment harnesses (A/B panels, forensics, rollouts)
-├── calibration/live.md      the measurement ledger: every sub, every gate, every number
-├── tests/                   226 unit tests
-├── docs/architecture.svg    the pipeline diagram
-├── bundle.py                single-file submission bundling
-└── pack.sh                  archive build + bank-for-bank validation
+main.py                  competition entry point
+kagfarm/
+  policy.py              the agent: world state, strategy zoo, selector, planners
+  route.py               worker scheduling
+  constants.py           game tables and feature-flag defaults
+  opening_book*.json     precomputed opening sequences
+engine.py                my local reimplementation of the game rules
+eval.py / sweep.py       local evaluation and parameter sweeps
+bridge/real_env.py       evaluation through the real competition engine
+analysis/                ~78 experiment scripts (A/B panels, forensics, rollouts)
+calibration/live.md      the ledger: every experiment, gate and number
+tests/                   226 unit tests
+bundle.py / pack.sh      single-file bundling and validated packaging
 ```
-
-## Quick start
-
-```bash
-bash bootstrap.sh                                                    # venv + pinned deps
-PYTHONHASHSEED=0 .venv/bin/python -m unittest discover -s tests -q  # 226 tests
-PYTHONHASHSEED=0 PYTHON="$PWD/.venv/bin/python" SEEDS=8 bash pack.sh # build + validate
-```
-
-Local evaluation runs the agent against the vendored competition engine via
-`bridge/real_env.py`; `analysis/` contains the battery harnesses
-(`judge_bar.py`, `paired_harness_real.py`, `zoo_rollout.py`, …).
-
----
 
 ## What I learned
 
-- **Good heuristics need adversarial measurement.** Strategies that looked obviously
-  better lost when the opponent pool widened; the only defense is a battery you trust.
-- **State representation is the leverage point.** The shared-forecast rewrite found
-  real bugs (a silently inert mechanism shipped for two cycles; a day-0 falsy-value
-  bug in the opponent calendar) that local reasoning had missed for weeks.
-- **Optimization is always constrained.** The real question is never "what's the best
-  action" but "best action subject to time, labor, cash, shed capacity and the
-  opponent's next ten production waves."
-- **Tooling is the deliverable.** Deterministic seeds, bank-for-bank pack checks,
-  a written ledger with regression rows — that's what makes 30+ submission cycles
-  iterable without re-learning the same lessons.
-- **Robustness beats a fragile trick.** A mechanism that wins one matchup and loses
-  another is worth less than a W/L-neutral one that removes a failure mode.
+- **Good heuristics need adversarial measurement.** Strategies that looked clearly better
+  lost once the opponent pool widened.
+- **State representation is the leverage point.** The shared-forecast rewrite found real
+  bugs that weeks of local reasoning had missed, including a day-0 falsy-value bug in the
+  opponent calendar.
+- **Optimization is always constrained.** The question is never "what's the best action"
+  but "what's the best action given time, labor, cash, shed capacity and the rival's next
+  ten production waves.
+- **Robustness beats a clever trick.** A mechanism that wins one matchup and loses
+  another is worth less than a neutral one that removes a failure mode.
 
-## Future work
+## What I'd do next
 
-- Runtime promotion of the zoo: the selector machinery is shipped flag-dormant;
-  the E0-vs-E7 conditional panel on the elite/wall tiers decides whether it arms.
-- 24/48/96-turn terminal-value rollouts over the shared WorldState.
-- Richer opponent phenotype posteriors (revenue-by-product telemetry is already wired).
-- Self-play opponent pools for automated strategy discovery.
+- **Fix the ceiling against strong opponents.** Losses above 600 Elo trace to herds
+  collapsing when workers can't keep up with feeding and care. The service-slack model
+  targets this; the next step is testing it on the elite tiers.
+- **Arm the strategy selector.** It ships switched off, pending a head-to-head panel on
+  the elite and wall tiers.
+- **Look ahead 24 to 96 turns** using rollouts over the shared world state.
+- **Richer opponent modelling**, and self-play against a pool of opponents to discover
+  strategies automatically.
 
-## Notes
+## Competition and licensing
 
-Some competition assets are intentionally not committed (they originate from
-Kaggle's engine or are multi-GB replay datasets); `bootstrap.sh` re-vendors the
-engine, and `analysis/restore_replays.py` re-fetches replays. See
-[FREEZE_CHECKLIST.md](FREEZE_CHECKLIST.md) and `calibration/` for the details.
+Built for [Kaggriculture on Kaggle](https://www.kaggle.com/competitions/kaggriculture).
+Game engine and assets belong to their respective owners.
 
-## Competition
-
-[Kaggriculture on Kaggle](https://www.kaggle.com/competitions/kaggriculture) —
-build an autonomous agent that manages a farm and out-earns a rival agent in a
-dynamic simulated economy.
-
----
-
-<div align="center">
-
-**Observe. Model. Decide. Execute. Measure. Improve.**
-
-</div>
+<!-- TODO: add a LICENSE file and state it here, after checking what the vendored engine allows. -->
