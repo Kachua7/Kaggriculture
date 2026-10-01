@@ -258,4 +258,46 @@ BUILTIN_AGENTS = {
     # restraint raises both banks, so it looks like a $25k win until you check whether the flooder
     # still takes the episode. It does. See the matrix in `analysis/melon_matrix.py`.
     "self_mix2": make_self_agent({"mix_cap": 2.0}),
+    # Synthetic archetypes for the robustness panel (analysis/archetype_panel.py). The real
+    # ladder field is not a mirror: these four span the behaviour axes that could make a
+    # mirror-tuned cell wrong. All are the same Policy with a few knobs moved — the same
+    # overlay trick the ablations use — so they are strong players with one distorted drive.
+    #   passive:  farms a tiny patch, never touches melon. Tests: does our cell still fund
+    #             the melon opening when nobody contests it (it should — the cap is
+    #             liquidity-proportional and must stay inert against weak markets).
+    #   hoarder:  buys every seed it can afford and sells almost nothing until the endgame.
+    #             Tests: supply-shock price depression in OUR crops' books.
+ #   flooder:  DUMPS melon from day 11 (windfall_pct=1.0, mix_cap=100). Tests: our
+    #             sell-timing when the shared melon book is glutted by someone else.
+    #   snapper:  buys land on day 11 instead of planting through it (windfall_pct=0.05,
+    #             windfall_reserve=2 — maximal cash retention). Tests: mid-season land races.
+    "arch_passive": make_self_agent({"mix": {"WHEAT": 9, "CARROT": 3, "MELON": 1, "STRAWBERRY": 6},
+                                     "max_hands": 4, "windfall_pct": 1.0, "n_animals": 0}),
+    "arch_hoarder": make_self_agent({"haul_trigger": 999.0, "endgame_days": 3}),
+    "arch_flooder": make_self_agent({"windfall_pct": 1.0, "mix_cap": 100.0, "endgame_days": 2}),
+    "arch_snapper": make_self_agent({"windfall_pct": 0.05, "windfall_reserve": 2,
+                                     "max_hands": 14}),
+    # The LIVE-META archetype, mirrored from the two autopsied ladder losses (2026-09-17,
+    # see calibration/live.md): both winners out-hired us ~1.8x, bought wheat seeds
+    # continuously (58/57 orders vs our 6/7), and spent down to near-zero mid-season.
+    # This is the B2 opponent the synthetic panel never had -- the shape that actually
+    # beats the shipped cell on the ladder. Two flavours:
+    #   meta_labor:  big roster, early land, melon kept but subordinated; the volume farm.
+    #   meta_allin:  the Aotokitsuruya extreme -- near-zero cash mid-season, everything
+    #                recycled into seed+wages, minimal land racing.
+    "arch_meta_labor": make_self_agent({"max_hands": 16, "labour_slack": 1.6,
+                                        "land_margin": 1.05, "windfall_pct": 0.75,
+                                        "mix": {"WHEAT": 18, "CARROT": 3, "MELON": 8,
+                                                "STRAWBERRY": 12}}),
+    "arch_meta_allin": make_self_agent({"max_hands": 14, "labour_slack": 1.8,
+                                        "windfall_pct": 0.95, "windfall_reserve": 0,
+                                        "mix": {"WHEAT": 24, "CARROT": 6, "MELON": 3,
+                                                "STRAWBERRY": 9}}),
+    # REPLAY_MARKET_PRESSURE sparring partners (frozen plan Part B): real ladder seats
+    # replaying their recorded market orders VERBATIM at their exact turns, greedy body
+    # underneath. Type B, not faithful replays -- the R_p calibration gate in
+    # analysis/ab_panel.py quantifies exactly how faithful each one is before it is
+    # trusted as a judge. Import-time build keeps it spawn-safe (pool workers re-import
+    # agents fresh); a malformed replay is skipped, never fatal to import.
+    **__import__("replay_opp").build_manifest(),
 }

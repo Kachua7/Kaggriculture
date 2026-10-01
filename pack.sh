@@ -26,9 +26,18 @@ export COPYFILE_DISABLE=1
 
 SHIP_ROOT=(main.py)
 SHIP_PKG=(kagfarm/__init__.py kagfarm/constants.py kagfarm/route.py kagfarm/policy.py)
+# Data file for the opening book (opening_book=1 reads it). Optional by design: the
+# loader tolerates absence (planner fallback), so bundle.py's single-file variant
+# ships without it and still plays.
+# 0930c: kagfarm/opening_book_elite.json joins the ship list (the FULL ELITE CLONE
+# book; elite_book=1 reads it, same optional-by-design loader contract).
+SHIP_DATA=(kagfarm/opening_book.json kagfarm/opening_book_elite.json)
 
 for f in "${SHIP_ROOT[@]}" "${SHIP_PKG[@]}"; do
   [ -f "$f" ] || { echo "!! $f is missing — nothing to pack."; exit 1; }
+done
+for f in "${SHIP_DATA[@]}"; do
+  [ -f "$f" ] || { echo "   (note: $f absent — shipping without the opening book)"; SHIP_DATA=(); break; }
 done
 
 # Every .py under kagfarm/ has to be in SHIP_PKG. Listing the files explicitly is what keeps
@@ -49,10 +58,16 @@ mkdir -p "$STAGE/kagfarm" "$UNPACKED"
 
 cp "${SHIP_ROOT[@]}" "$STAGE/"
 cp "${SHIP_PKG[@]}" "$STAGE/kagfarm/"
+if [ "${#SHIP_DATA[@]}" -gt 0 ]; then cp "${SHIP_DATA[@]}" "$STAGE/kagfarm/"; fi
 
 # `-C "$STAGE"` puts main.py at the archive root. The harness looks for it there; a leading
 # directory is the difference between a ranked submission and a validation error.
-tar -czf "$OUT" -C "$STAGE" main.py kagfarm
+# Reproducible bytes (0930d): tar headers carry file mtimes (fresh on every staged
+# copy) and gzip carries its own, so pin the staged tree to a fixed mtime and gzip
+# with -n. Two packs of the same tree must produce the same sha, or the
+# artifact-of-record is ambiguous.
+find "$STAGE" -print0 | xargs -0 touch -t 202609300000.00
+tar -cf - -C "$STAGE" main.py kagfarm | gzip -n > "$OUT"
 
 echo "==> $OUT ($(wc -c <"$OUT" | tr -d ' ') bytes)"
 tar -tzf "$OUT" | sed 's/^/    /'
@@ -68,8 +83,11 @@ fi
 if [ -f bundle.py ]; then
   "$PY" bundle.py --seeds 2 >"$TMP/bundle.log" 2>&1 \
     && echo "==> single-file fallback: submission/main.py (verified)" \
-    || { echo "!! bundle.py failed — single-file fallback is stale. Tail:";
-         tail -4 "$TMP/bundle.log" | sed 's/^/    /'; }
+    || { echo "!! bundle.py failed — refusing to pack: submission/main.py would be
+!! a stale agent next to a fresh tarball (0930d: the embedding safety check
+!! fired here and only a warning stood between the tree and a bad upload).";
+         tail -4 "$TMP/bundle.log" | sed 's/^/    /';
+         exit 1; }
 fi
 
 tar -xzf "$OUT" -C "$UNPACKED"

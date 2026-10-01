@@ -48,26 +48,66 @@ import time
 # The import machinery in `main.py`, which the bundle does not need because `Policy` is already
 # defined above it by then. Matched exactly rather than by regex: if `main.py` changes shape the
 # replacement fails loudly instead of quietly shipping a file that cannot find its own policy.
-MAIN_IMPORT_BLOCK = """from __future__ import annotations
+MAIN_IMPORT_BLOCK = '''from __future__ import annotations
 
 import os
 import sys
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
+
+def _locate_root():
+    """Directory containing the kagfarm package, without ever touching __file__ blindly."""
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))    # real module import context
+        if os.path.isfile(os.path.join(here, "kagfarm", "policy.py")):
+            return here
+    except NameError:
+        pass                                                  # exec'd source: no __file__
+    for cand in sys.path:                                     # harness exec context
+        try:
+            if cand and os.path.isfile(os.path.join(cand, "kagfarm", "policy.py")):
+                return cand
+        except Exception:
+            pass
+    return os.getcwd()
+
+
+_HERE = _locate_root()
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 _POLICIES = {}
 _BROKEN = None
 
-try:
+
+def _import_policy():
+    """Import OUR kagfarm package, not a same-named one an earlier agent cached.
+
+    The harness can run both seats in one process. If the opponent also ships a top-level
+    package named `kagfarm` and their agent is built first, `sys.modules` caches theirs and
+    a plain `from kagfarm.policy import Policy` would silently bind their code -- this seat
+    would then PASS all episode (or worse, play their policy). So: import, check the loaded
+    package actually lives in _HERE, purge and re-import if it does not (re-import only
+    affects new lookups; the opponent's already-bound references are untouched).
+    """
+    import kagfarm
+    pkg_dir = os.path.dirname(os.path.abspath(kagfarm.__file__))
+    if os.path.realpath(pkg_dir) != os.path.realpath(os.path.join(_HERE, "kagfarm")):
+        for name in [m for m in list(sys.modules)
+                     if m == "kagfarm" or m.startswith("kagfarm.")]:
+            del sys.modules[name]
+        import kagfarm
     from kagfarm.policy import Policy
+    return Policy
+
+
+try:
+    Policy = _import_policy()
 except Exception as _e:                        # pragma: no cover - sandbox import failure
     Policy = None
     _BROKEN = repr(_e)
-"""
+'''
 
-MAIN_REPLACEMENT = """# -- entry point ------------------------------------------------------------------------------
+MAIN_REPLACEMENT = '''# -- entry point ------------------------------------------------------------------------------
 # `Policy` is defined above in this same file, so the guarded import the package build needs is
 # replaced by the two names that depended on it. `Policy is None` stays reachable as a concept --
 # nothing sets it now -- because the `agent` body below is copied verbatim from `main.py` and
@@ -75,7 +115,8 @@ MAIN_REPLACEMENT = """# -- entry point -----------------------------------------
 
 _POLICIES = {}
 _BROKEN = None
-"""
+Policy = Policy
+'''
 
 
 def strip_module(src):
@@ -113,7 +154,24 @@ def build():
     if MAIN_IMPORT_BLOCK not in main_src:
         raise SystemExit("bundle.py: main.py's import block has changed shape -- update "
                          "MAIN_IMPORT_BLOCK to match before regenerating the bundle.")
-    parts.append(main_src.replace(MAIN_IMPORT_BLOCK, MAIN_REPLACEMENT).split('"""', 2)[2]
+    # 0930c-sub24: embed the elite opening book into the single-file build. The package
+    # build reads kagfarm/opening_book_elite.json from beside policy.py (pack.sh ships
+    # it); the flattened file has no package directory, so without the embedding the
+    # bundle would silently play book-off and bank-for-bank verification would compare
+    # two different agents. Optional by design: a missing file just ships planner-only.
+    replacement = MAIN_REPLACEMENT
+    book_path = os.path.join(_HERE, "kagfarm", "opening_book_elite.json")
+    if os.path.exists(book_path):
+        with open(book_path) as fh:
+            book_src = fh.read()
+        if "'''" in book_src or "\\" in book_src:
+            raise SystemExit("bundle.py: elite book contains triple quotes or backslashes "
+                             "-- the raw-string embedding is unsafe; change the mechanism.")
+        replacement += ("\n\n# -- elite opening book (embedded for the single-file build) ----------------------\n"
+                        "# The package build reads kagfarm/opening_book_elite.json from its own directory;\n"
+                        "# this flattened file embeds it verbatim so both builds play the same agent.\n"
+                        "_elite_book_embedded = json.loads(r'''" + book_src + "''')\n")
+    parts.append(main_src.replace(MAIN_IMPORT_BLOCK, replacement).split('"""', 2)[2]
                  .strip("\n") + "\n")
     return "\n".join(parts)
 

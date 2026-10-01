@@ -49,6 +49,7 @@ from kagfarm.constants import (  # noqa: E402
     SHOP_TABLE, TOWN_CENTER_PRODUCTS,
     fib_hire_cost, hire_cost_total, price_for, _f,
 )
+import kagfarm.constants as _kfc  # noqa: E402  -- profile-swappable rows are read live
 
 
 # ---------------------------------------------------------------------------
@@ -277,6 +278,14 @@ class KaggricultureEnv:
         at_shed = (x, y) in SHED_TILES.values()
 
         if name == "PICKUP":
+            # H4 fix (2026-09-17, ladder evidence): the real engine requires the unit to
+            # stand on a shed-access tile -- `if not _is_shed_adjacent(...): return` --
+            # so a PICKUP emitted anywhere else silently no-ops on the ladder. The mirror
+            # had no check, which let the policy's one-leg placement job work locally and
+            # rot every bought animal in the shed for real (8/8 replays: COW:2 unsold,
+            # zero milk sold). The mirror now matches the real rule.
+            if (x, y) not in set(SHED_TILES.values()):
+                return
             item, n = args[0], (args[1] if len(args) > 1 else 1)
             have = f.shed.get(item, 0)
             take = min(have, n)
@@ -296,9 +305,10 @@ class KaggricultureEnv:
             item = args[0]
             n = args[1] if len(args) > 1 else 1
             if tile is not None and tile != "LOCKED" and isinstance(tile, dict) and tile.get("kind") in ("COOP", "PASTURE"):
-                # place animal from inventory onto matching empty structure
+                # Engine-exact (H5): emptiness test is `"animal" not in tile` -- BUILD
+                # creates just {"kind": ...} and PLACE writes the full animal shape.
                 needed_struct = ANIMAL_STRUCTURE.get(item)
-                if tile["kind"] == needed_struct and tile.get("animal") is None and inv.get(item, 0) > 0:
+                if tile["kind"] == needed_struct and "animal" not in tile and inv.get(item, 0) > 0:
                     tile["animal"] = item
                     tile["placed_day"] = self.day
                     tile["yield_units"] = 0
@@ -319,11 +329,11 @@ class KaggricultureEnv:
                     del inv[item]
             return
 
-        if tile == "LOCKED" or tile is None and name not in ("PLANT", "BUILD_COOP", "BUILD_PASTURE"):
-            # most tile ops no-op on locked or (for non-plant ops) empty tiles below;
-            # PLANT / BUILD are handled explicitly and check emptiness themselves
-            if tile == "LOCKED":
-                return
+        if tile == "LOCKED":
+            return
+        if tile is None and name not in ("PLANT", "BUILD_COOP", "BUILD_PASTURE"):
+            # most tile ops no-op on empty tiles; PLANT / BUILD check emptiness themselves
+            return
 
         if name == "PLANT":
             crop = args[0]
@@ -395,35 +405,38 @@ class KaggricultureEnv:
             return
 
         if name == "FERTILIZE":
+            # H4 fix: real engine takes the dose from the UNIT'S CARRIED inventory
+            # (`_inv_take(inv, "FERTILIZER", 1)`), not the shed.
             if isinstance(tile, dict) and tile.get("kind") == "PLANT":
-                have = f.shed.get("FERTILIZER", 0)
+                have = inv.get("FERTILIZER", 0)
                 if have > 0:
-                    f.shed["FERTILIZER"] = have - 1
-                    if f.shed["FERTILIZER"] == 0:
-                        del f.shed["FERTILIZER"]
-                    tile["fertilized_until_day"] = self.day + 3
+                    inv["FERTILIZER"] = have - 1
+                    if inv["FERTILIZER"] == 0:
+                        del inv["FERTILIZER"]
+                    # H4 fix: real engine `max(existing, day + 2)` -- active days d..d+2,
+                    # 3 inclusive. The mirror wrote day+3, a 4th free day of fertility in
+                    # every local gate.
+                    tile["fertilized_until_day"] = max(tile.get("fertilized_until_day", -1), self.day + 2)
             return
 
         if name == "BUILD_COOP" or name == "BUILD_PASTURE":
             if tile is None:
+                # Engine-exact (H5): BUILD creates a bare `{"kind": ...}` -- the full
+                # `_new_animal` shape (animal/placed_day/...) is written only by PLACE,
+                # and the `"animal"` key only ever exists on a placed animal. The old
+                # `"animal": None` shape made every empty structure look like a ghost
+                # animal to any observer using the real engine's `"animal" in tile` test.
                 f.tiles[y][x] = {
                     "kind": "COOP" if name == "BUILD_COOP" else "PASTURE",
-                    "animal": None, "placed_day": self.day, "yield_units": 0,
-                    "fed_today": False, "consecutive_unfed": 0, "cared_today": False,
-                    "fertilizer_available": False, "pending_care_bonus": 0,
                 }
             return
 
         if name == "FEED":
+            # H4 fix: the real engine feeds from the UNIT'S CARRIED wheat only
+            # (`_inv_take(inv, "WHEAT", 1)`), never from the shed. The mirror drew
+            # shed-first, so locally-fed animals starved on the ladder.
             if isinstance(tile, dict) and tile.get("kind") in ("COOP", "PASTURE") and tile.get("animal"):
-                have = f.shed.get("WHEAT", 0) or inv.get("WHEAT", 0)
-                # spend from shed first, then carried inventory
-                if f.shed.get("WHEAT", 0) > 0:
-                    f.shed["WHEAT"] -= 1
-                    if f.shed["WHEAT"] == 0:
-                        del f.shed["WHEAT"]
-                    tile["fed_today"] = True
-                elif inv.get("WHEAT", 0) > 0:
+                if inv.get("WHEAT", 0) > 0:
                     inv["WHEAT"] -= 1
                     if inv["WHEAT"] == 0:
                         del inv["WHEAT"]
@@ -483,11 +496,24 @@ class KaggricultureEnv:
             q1 = self._expand_units(per_player.get(1, []))
             i0 = i1 = 0
             while i0 < len(q0) or i1 < len(q1):
-                if i0 < len(q0):
-                    self._settle_one_unit(0, resource, q0[i0])
+                # Real-engine lockstep semantics (`_process_market`): both players are
+                # QUOTED at the same pre-commit inventory, then both commit. The mirror
+                # used to settle seat 0 before quoting seat 1, giving the evaluated seat
+                # (always 0 in eval.py) a small systematic price advantage.
+                op0 = q0[i0] if i0 < len(q0) else None
+                op1 = q1[i1] if i1 < len(q1) else None
+                px0 = self._quote_unit(0, resource, op0) if op0 else None
+                px1 = self._quote_unit(1, resource, op1) if op1 else None
+                # Quote-None (empty-market buy) drops the unit without side effects -- the
+                # real loop kills the refused order. Advance regardless: a stall here would
+                # hang the episode.
+                if op0:
+                    if px0 is not None:
+                        self._settle_one_unit(0, resource, op0, px0)
                     i0 += 1
-                if i1 < len(q1):
-                    self._settle_one_unit(1, resource, q1[i1])
+                if op1:
+                    if px1 is not None:
+                        self._settle_one_unit(1, resource, op1, px1)
                     i1 += 1
 
     @staticmethod
@@ -498,14 +524,35 @@ class KaggricultureEnv:
             out.extend([op] * max(0, int(n)))
         return out
 
-    def _settle_one_unit(self, pi: int, resource: str, op: str):
+    def _quote_unit(self, pi: int, resource: str, op: str):
+        """Price one unit at the CURRENT (pre-commit) inventory, for the lockstep round.
+
+        Returns None when the unit cannot trade at all (empty market for a buy), so the
+        caller drops it without side effects -- the same observable outcome as the real
+        engine's refusal loop.
+        """
+        inv = self.market_inventory[resource]
+        if op == "SELL":
+            return price_for(resource, inv)
+        if op == "BUY_PRODUCT":
+            if resource not in BUYBACK or inv - 1 < 0:
+                return None
+            return price_for(resource, inv - 1)   # post-buy inventory
+        return None
+
+    def _settle_one_unit(self, pi: int, resource: str, op: str, price=None):
         f = self.farms[pi]
         inv = self.market_inventory[resource]
         if op == "SELL":
             have = f.shed.get(resource, 0)
             if have <= 0:
                 return
-            price = price_for(resource, inv)  # pre-sell inventory
+            # [analysis hook] executed-unit counter; inert unless an analysis script
+            # pre-seeds the dict (see analysis/monitor_truth.py).
+            if getattr(self, "_exec_hook", None) is not None:
+                self._exec_hook[(pi, resource, op)] += 1
+            if price is None:                     # legacy 3-arg callers (analysis hooks)
+                price = price_for(resource, inv)  # pre-sell inventory
             f.shed[resource] = have - 1
             if f.shed[resource] == 0:
                 del f.shed[resource]
@@ -515,12 +562,23 @@ class KaggricultureEnv:
         elif op == "BUY_PRODUCT":
             if resource not in BUYBACK:
                 return
-            post_inv = inv - 1
-            if post_inv < 0:
-                return
-            price = price_for(resource, post_inv)  # post-buy inventory
+            if price is None:                     # legacy 3-arg callers (analysis hooks)
+                post_inv = inv - 1
+                if post_inv < 0:
+                    return
+                price = price_for(resource, post_inv)  # post-buy inventory
+            else:
+                post_inv = inv - 1
             if f.money < price:
                 return
+            # Real `_commit_unit` REFUSES a buy into a full shed -- no charge, no item.
+            # The mirror used to charge and silently discard the overflow, understating
+            # bank in crowded-shed states versus the engine the ladder runs.
+            if sum(f.shed.values()) >= SHED_CAPACITY:
+                return
+            # [analysis hook] executed-unit counter (same scheme as SELL).
+            if getattr(self, "_exec_hook", None) is not None:
+                self._exec_hook[(pi, resource, op)] += 1
             f.money -= price
             self._add_shed(f, resource, 1)
             self.market_inventory[resource] = post_inv
@@ -547,6 +605,10 @@ class KaggricultureEnv:
             for _ in range(n):
                 if f.money < cost:
                     break
+                # Real `_commit_unit` refuses a buy into a full shed (no charge, no item,
+                # order dropped) -- mirror the refusal instead of charging for a discard.
+                if sum(f.shed.values()) >= SHED_CAPACITY:
+                    break
                 f.money -= cost
                 self._add_shed(f, animal, 1)
         elif op == "HIRE":
@@ -566,19 +628,18 @@ class KaggricultureEnv:
                     break
 
     def _spawn_hand_pos(self, f: Farm) -> list:
-        sx, sy = SHED_TILES["NW"]
-        candidates = [(sx, sy - 1), (sx - 1, sy), (sx, sy + 1), (sx + 1, sy)]  # N W S E
-        occ = {(f.farmer[0], f.farmer[1])}
-        for h in f.hands:
-            occ.add((h[0], h[1]))
-        counts = []
-        for cx, cy in candidates:
-            counts.append(sum(1 for (ox, oy) in occ if ox == cx and oy == cy))
+        # Real `_spawn_hand`: the first least-occupied SHED-ACCESS tile in NWSE order,
+        # counting the farmer and every hand (access tiles can stack). The previous ring
+        # N/W/S/E around (4,4) contained two non-shed tiles, excluded two shed tiles, and
+        # disagreed with the policy's own `_spawn_guess` regression test.
+        order = [SHED_TILES["NW"], SHED_TILES["NE"], SHED_TILES["SW"], SHED_TILES["SE"]]
+        occ = [(f.farmer[0], f.farmer[1])] + [(h[0], h[1]) for h in f.hands]
+        counts = [sum(1 for p in occ if p == c) for c in order]
         best = min(counts)
-        for (cx, cy), c in zip(candidates, counts):
-            if c == best:
-                return [cx, cy]
-        return list(candidates[0])
+        for c, k in zip(order, counts):
+            if k == best:
+                return [c[0], c[1]]
+        return [order[0][0], order[0][1]]
 
     # -- town ---------------------------------------------------------
 
@@ -589,25 +650,32 @@ class KaggricultureEnv:
                 basket = SHOP_TABLE[shop]
                 for product, qty in basket.items():
                     self.market_inventory[product] = max(0.0, self.market_inventory[product] - qty)
-        if t % TOWN_CENTER_SELL_INTERVAL_TURNS == 0:
+        if t % _kfc.TOWN_CENTER_SELL_INTERVAL_TURNS == 0:
+            # Units per tick follow the engine profile: 1.32.7 is flat 1; 1.32.2 stages
+            # [(20,4),(10,2),(0,1)] by day (calibration/engine-1.32.2 _town_consume).
+            mult = _kfc.town_center_multiplier(self.day)
             for product in TOWN_CENTER_PRODUCTS:
-                self.market_inventory[product] = max(0.0, self.market_inventory[product] - 1)
+                self.market_inventory[product] = max(0.0, self.market_inventory[product] - mult)
 
     # -- day refresh ---------------------------------------------------------
 
     def _day_refresh(self):
         new_day = self.day  # self.t already advanced past midnight
-        # Unlock a new shop every N days, cap 8, sampled WITHOUT replacement.  [real]
-        # The replay unlocks ICE_CREAM_SHOP, YARN_STORE, BRUNCH_SPOT, SMOOTHIE_SHOP,
-        # PIZZA_SHOP, PET_CAFE, BAKERY, FARMERS_MARKET on days 3,6,...,24 — all eight types,
-        # no repeats. Under the with-replacement draw this used to do, eight distinct draws
-        # from eight types has probability 8!/8^8 = 0.24%, so the real engine is permuting.
-        # This is not a cosmetic fix: with replacement the expected number of distinct shops
-        # by day 24 is 5.2, not 8, so the mirror was understating late-season demand for
-        # everything in the baskets by roughly a third.
+        # Unlock a new shop every N days, cap 8 instances, sampled WITH replacement.
+        # [real:1.32.7-source] — the pinned engine draws from all eight types with
+        # replacement; duplicates consume independently. The tutorial replay's eight
+        # distinct shops on days 3..24 date that recording to 1.32.2, which drew without
+        # replacement (rng.choice(sorted(remaining))); this file follows the pin.
+        # Probability of that draw under replacement is 8!/8^8 = 0.24%.
         if new_day % TOWN_SHOP_UNLOCK_INTERVAL_DAYS == 0 and new_day > 0 and len(self.shops) < MAX_SHOP_INSTANCES:
-            remaining = [s for s in SHOP_TABLE if s not in self.shops]
-            self.shops.append(self.rng.choice(remaining or list(SHOP_TABLE.keys())))
+            # Draw rule follows the engine profile: 1.32.7 with replacement; 1.32.2 drew
+            # rng.choice(sorted(remaining)) without replacement (the replay's 8 distinct
+            # shops on days 3..24 date it).
+            if _kfc.UNLOCK_WITH_REPLACEMENT:
+                self.shops.append(self.rng.choice(list(SHOP_TABLE.keys())))
+            else:
+                remaining = sorted(s for s in SHOP_TABLE if s not in self.shops)
+                self.shops.append(self.rng.choice(remaining or list(SHOP_TABLE.keys())))
 
         for f in self.farms:
             # dump every unit's inventory into the shed
@@ -660,7 +728,9 @@ class KaggricultureEnv:
         if spec["kind"] == "one_time":
             if not (spec["bonus_start"] <= age <= spec["bonus_end"]):
                 return
-            cap = spec["max_yield"] if fertilized else spec["max_yield_unfert"]
+            # The engine (1.32.2 and 1.32.7 alike) caps WATER at max_yield whether
+            # fertilized or not; max_yield_unfert in OBJECT_TABLE is dead mirror data.
+            cap = spec["max_yield"]
             tile["yield_units"] = min(cap, tile["yield_units"] + gain)
         else:
             sched = spec["sched_days"]
@@ -723,9 +793,13 @@ class KaggricultureEnv:
             tile["consecutive_unfed"] = 0
 
         if tile["consecutive_unfed"] >= 2:
-            tile["animal"] = None  # escapes, unrecoverable
-            tile["yield_units"] = 0
-            tile["pending_care_bonus"] = 0
+            # Engine-exact (H5): the animal escapes and the structure REMAINS as a bare
+            # `{"kind": ...}` (the real engine rebuilds it from ANIMALS[..]["structure"]);
+            # it does not stay behind as a None-shaped animal tile. The tile object is
+            # mutated in place because this method has no x/y; nobody holds cross-step
+            # tile references.
+            tile.clear()
+            tile["kind"] = spec["structure"]
             return
 
         # fertilizer: 1 unit available at end of every day regardless of fed/cared,
@@ -738,15 +812,19 @@ class KaggricultureEnv:
 
         if is_production_day:
             base_gain = 1
+            # H5 (2026-09-18, source-verified against the vendored engine): a fed production
+            # day consumes the banked bonus; an UNFED production day adds base 1 only and the
+            # bank is wiped anyway (`pending_care_bonus = 0` is unconditional there) -- care
+            # earned while unfed-fed gaps exist is destroyed, not deferred. Accrual itself
+            # requires fed AND cared and runs on every day including production days.
             if fed:
                 total = base_gain + tile.get("pending_care_bonus", 0)
                 tile["yield_units"] = min(spec["max_held"], tile["yield_units"] + total)
             else:
                 tile["yield_units"] = min(spec["max_held"], tile["yield_units"] + base_gain)
             tile["pending_care_bonus"] = 0
-        else:
-            if fed and cared:
-                tile["pending_care_bonus"] = tile.get("pending_care_bonus", 0) + 1
+        if fed and cared:
+            tile["pending_care_bonus"] = tile.get("pending_care_bonus", 0) + 1
 
         tile["fed_today"] = False
         tile["cared_today"] = False

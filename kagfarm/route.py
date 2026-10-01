@@ -69,7 +69,68 @@ def nearest_shed(pos, unlocked):
     return min(cands, key=lambda p: manhattan(pos, p))
 
 
-def split_runs(jobs, units, turns_left, deliver_reserve=0):
+def assign_runs(jobs, units, turns_left, deliver_reserve=0):
+    """0930o P0-A: the third scheduler, replacing the budget-break assignment.
+
+    The shipped split_runs BREAKS a unit's run at the first over-budget job; the shared
+    cursor then hands every later job to the next unit in serpentine order, so one
+    expensive head job can cascade (mirror-measured: the skip variant stranded a whole
+    day's work — 44.9k vs 140.5k sum-bank — because SKIPPING advanced the cursor with
+    nobody taking the job). The defect in both is that an impossible job consumes the
+    cursor. This implementation never lets it:
+
+      pass 1  serpentine sweep with the same per-unit take caps and budget as split_runs,
+              except an over-budget job is set aside for pass 2 and the scan CONTINUES
+              (the unit takes the next job that fits — the run keeps its contiguity
+              except for set-aside seams, which are exactly the work the day cannot
+              afford at this position);
+      pass 2  global reassignment: every set-aside job goes to the unit with the
+              cheapest marginal walk from where that unit's run ENDED, appended if it
+              fits that unit's remaining budget, else dropped (the honest outcome —
+              the roster physically cannot service it today).
+
+    Deterministic, no randomness; monotone in serpentine order for the base runs.
+    """
+    order = sorted(units, key=lambda u: serpentine_key(u[1]))
+    out = {i: [] for i, _ in units}
+    ends = {i: start for i, start in units}
+    spent = {i: 0 for i, _ in units}
+    if not order:
+        return out
+    budget = turns_left - deliver_reserve
+    per_unit = max(1, len(jobs) // len(order) + (1 if len(jobs) % len(order) else 0))
+    deferred = []
+    qi = 0
+    for slot, (idx, start) in enumerate(order):
+        pos = start
+        take_cap = per_unit if slot < len(order) - 1 else len(jobs)
+        while qi < len(jobs) and len(out[idx]) < take_cap:
+            j = jobs[qi]
+            cost = manhattan(pos, j["pos"]) + j.get("acts", 1)
+            if spent[idx] + cost > budget:
+                deferred.append(j)          # set aside, cursor advances, scan continues
+                qi += 1
+                continue
+            out[idx].append(j)
+            spent[idx] += cost
+            pos = j["pos"]
+            ends[idx] = j["pos"]
+            qi += 1
+    # pass 2: cheapest marginal unit per deferred job, deterministic tie-break by index
+    for j in deferred:
+        best, best_c = None, None
+        for idx, _ in order:
+            c = manhattan(ends[idx], j["pos"]) + j.get("acts", 1)
+            if spent[idx] + c <= budget and (best_c is None or c < best_c):
+                best, best_c = idx, c
+        if best is not None:
+            out[best].append(j)
+            spent[best] += best_c
+            ends[best] = j["pos"]
+    return out
+
+
+def split_runs(jobs, units, turns_left, deliver_reserve=0, skip_stuck=False):
     """Cut a serpentine-ordered job list into one contiguous run per unit.
 
     `jobs`    serpentine-ordered list of job dicts, each with a "pos" key and an optional
@@ -80,6 +141,12 @@ def split_runs(jobs, units, turns_left, deliver_reserve=0):
     `deliver_reserve`  turns held back so a unit carrying harvest can still reach a shed
                        tile and DROP. Costs a job; on the last day it is the difference
                        between selling the harvest and losing it.
+    `skip_stuck`  0930m: a job over budget BREAKS this unit's run by default, stranding
+                  every later job for the units behind it in serpentine order (the cursor
+                  is shared). skip_stuck=1 SKIPS the job instead: the cursor advances,
+                  later units keep their contiguous runs, and only the physically
+                  impossible work falls off the end. A contiguity seam can appear at the
+                  skip point -- the cost of working on a day that cannot fit its own board.
 
     Returns {unit_index: [job, ...]}. Jobs that fit in nobody's budget are dropped, which is
     the honest outcome: the roster physically cannot service them today, and the caller has
@@ -109,7 +176,10 @@ def split_runs(jobs, units, turns_left, deliver_reserve=0):
             j = jobs[qi]
             cost = manhattan(pos, j["pos"]) + j.get("acts", 1)   # walk there, then the ops
             if spent + cost > budget:
-                break
+                if skip_stuck:
+                    qi += 1                     # skip the impossible job, keep the run
+                    continue
+                break                           # shipped form: run ends, later jobs strand
             out[idx].append(j)
             spent += cost
             pos = j["pos"]

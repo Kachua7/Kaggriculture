@@ -38,7 +38,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from eval import evaluate
-from kagfarm.policy import PARAMS
+from kagfarm.policy import PARAMS, PARAMS_BASE
 
 # Candidate values per axis. Ordered so the incumbent default is somewhere in the middle,
 # which makes a no-change pass cheap to recognise.
@@ -70,12 +70,28 @@ AXES = {
     "haul_trigger": [0.55, 1.0, 1.5, 2.0, 2.5, 999.0],
     "haul_min":    [10, 14, 18, 22, 28],
     "n_animals":   [0, 1, 2, 3, 4],
+    # Windfall cap (adopted 16 Sep; see the PARAMS block and analysis/autopsy.py). 1.0 is the
+    # documented off switch, so a descent can always walk back to the old behaviour.
+    "windfall_pct":    [0.30, 0.35, 0.40, 0.45, 0.55, 0.70, 1.0],
+    "windfall_reserve": [0, 2, 4],
+    # Work stealing (measured 16 Sep): idle 11.3% -> 8.7% of unit-turns, banks flat
+    # (aggregate +12, INCONCLUSIVE) -- the allocator already fits work to labour in the
+    # incumbent cell. Off by default; interesting only paired with a leaner roster
+    # (max_hands) where freed labour might bind.
+    "work_steal":      [0, 1],
+    # Market monitor (measured INCONCLUSIVE in-mirror, kept as ladder insurance -- see the
+    # AGENTS.md entry). monitor=0 is the incumbent; the knobs only matter with monitor=1.
+    "monitor":     [0, 1],
+    "opp_credit":  [0.0, 0.5, 1.0],
+    "sell_infer":  [0.0, 1.0],
 }
 # Dropped: `land_margin` and `px_cap`. Both measured flat across their whole candidate range on
 # 144 episodes -- every cell within noise of the incumbent -- so they only spent evaluations.
 
 
-def score(params, seeds, opps, workers, objective="mean"):
+def score(params, seeds, opps, workers, objective="mean", engine="mirror"):
+    import importlib
+    from kagfarm import policy as _policy
     """Panel score for one cell, or a large negative on any veto.
 
     A raise inside `Policy.act` is caught by its own guard and recorded in `last_error`, so it
@@ -91,7 +107,22 @@ def score(params, seeds, opps, workers, objective="mean"):
               while losing far more matches. Capping the melon opening does exactly that: +$25k
               of bank, -14pp of win rate. See `analysis/melon_matrix.py`.
     """
-    rows = evaluate(seeds, opps, workers=workers, quiet=True, params=params)
+    # The in-process real tier has no pool worker to re-import the module, so a previous
+    # cell's PARAMS mutations would leak into this one. Reset to the frozen import-time
+    # snapshot first, then apply this cell's overrides — or "changes" would compound
+    # silently and the holdout would score the incumbent cell with the winner's values.
+    from kagfarm.policy import PARAMS_BASE
+    _policy.PARAMS.clear()
+    _policy.PARAMS.update(PARAMS_BASE)
+    if params:
+        _policy.PARAMS.update(params)
+    # `params` must ALSO ride the job tuple: with the mirror tier's default process pool,
+    # each worker imports the module fresh and only sees this cell through `params` —
+    # passing None there would score every candidate at import-time defaults and turn the
+    # whole descent into a no-op that "confirms" the incumbent. In-process (real tier,
+    # workers=1) the reset above already leaves PARAMS == base+cell, so the update is
+    # idempotent and harmless.
+    rows = evaluate(seeds, opps, workers=workers, quiet=True, params=params, engine=engine)
     banks = sorted(r["bank"] for r in rows)
     if any(r["err"] for r in rows) or any(r["over_budget"] for r in rows):
         return -1e12, -1e12
@@ -109,9 +140,9 @@ def _fmt(s, objective):
     return "mean $%8.0f  p10 $%8.0f" % (s[0], s[1])
 
 
-def sweep(seeds, opps, axes, rounds, workers, objective="mean"):
+def sweep(seeds, opps, axes, rounds, workers, objective="mean", engine="mirror"):
     best = {k: PARAMS[k] for k in axes}
-    cur = score(best, seeds, opps, workers, objective)
+    cur = score(best, seeds, opps, workers, objective, engine)
     print("start %s -> %s" % (best, _fmt(cur, objective)))
     t0 = time.monotonic()
     evals = 1
@@ -123,7 +154,7 @@ def sweep(seeds, opps, axes, rounds, workers, objective="mean"):
                 if val == incumbent:
                     continue
                 cand = dict(best, **{axis: val})
-                s = score(cand, seeds, opps, workers, objective)
+                s = score(cand, seeds, opps, workers, objective, engine)
                 evals += 1
                 flag = ""
                 if s > cur:
@@ -138,20 +169,23 @@ def sweep(seeds, opps, axes, rounds, workers, objective="mean"):
     return best, cur
 
 
-def holdout(best, seeds, opps, workers, objective="mean"):
+def holdout(best, seeds, opps, workers, objective="mean", engine="mirror"):
     """Re-score the winning cell and the incumbent on seeds the descent never saw.
 
     Reported per axis as well as for the block, because the block is usually carried by one or
     two axes and the rest are fitted noise -- and it is cheaper to find that out here than to
     ship it.
     """
-    inc = {k: PARAMS[k] for k in best}
-    rows = [("incumbent", score(inc, seeds, opps, workers, objective))]
+    # True shipped defaults, not the live global: score() leaves PARAMS holding the last
+    # cell it scored, so reading PARAMS here would silently define the "incumbent" as
+    # whatever ran last.
+    inc = {k: PARAMS_BASE[k] for k in best}
+    rows = [("incumbent", score(inc, seeds, opps, workers, objective, engine))]
     for axis in best:
         if best[axis] != inc[axis]:
             rows.append(("%s = %s" % (axis, best[axis]),
-                         score(dict(inc, **{axis: best[axis]}), seeds, opps, workers, objective)))
-    rows.append(("all changes together", score(best, seeds, opps, workers, objective)))
+                         score(dict(inc, **{axis: best[axis]}), seeds, opps, workers, objective, engine)))
+    rows.append(("all changes together", score(best, seeds, opps, workers, objective, engine)))
     base = rows[0][1]
     a, b = ("win%", "mean") if objective == "wins" else ("mean", "p10")
     print("\nHOLDOUT on %d seeds x %s, %d episodes" % (len(seeds), ",".join(opps),
@@ -175,16 +209,18 @@ def main_cli():
                     help="'wins' for self-play: rank by episodes taken, tiebreak on bank")
     ap.add_argument("--holdout", type=int, default=24,
                     help="how many unseen seeds to re-score the winner on; 0 to skip")
+    ap.add_argument("--engine", choices=("mirror", "real"), default="mirror",
+                    help="score on engine.py (screening) or the vendored pinned engine")
     ap.add_argument("--out", default="analysis/sweep_best.json")
     a = ap.parse_args()
     axes = [x for x in a.axes.split(",") if x in AXES]
     opps = a.opps.split(",")
-    best, s = sweep(range(a.seeds), opps, axes, a.rounds, a.workers or None, a.objective)
+    best, s = sweep(range(a.seeds), opps, axes, a.rounds, a.workers or None, a.objective, a.engine)
     print("\nTUNING PANEL %s\n%s" % (_fmt(s, a.objective), json.dumps(best, indent=2)))
     hold = None
     if a.holdout:
         hold = holdout(best, range(a.seeds, a.seeds + a.holdout), opps, a.workers or None,
-                       a.objective)
+                       a.objective, a.engine)
     path = os.path.join(_HERE, a.out)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as fh:

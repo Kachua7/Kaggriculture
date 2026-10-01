@@ -82,17 +82,56 @@ def run_one(args):
     that dict, so mutating the module-level one is how a sweep injects a candidate without
     threading a config object through the submission entry point -- which has to stay a bare
     `agent(obs)` for Kaggle.
+
+    `args` may carry a trailing engine tag: "mirror" (default, engine.py, ~8 ms, the
+    screening tier) or "real" (the vendored kaggle-environments interpreter via
+    bridge/real_env.py, the confirmation tier -- see its docstring for the provenance
+    gate). Bank values are only comparable within one engine.
     """
-    seed, opp_name, agent_mod, params = (args + (None,))[:4] if len(args) < 4 else args
+    args = tuple(args) + (None,) * (5 - len(args))
+    seed, opp_name, agent_mod, params, engine = args[:5]
+    if engine == "real":
+        from bridge.real_env import run_one_real
+        return run_one_real((seed, opp_name, agent_mod, params))
     from engine import KaggricultureEnv
     from agents import BUILTIN_AGENTS
     from kagfarm import policy as _policy
 
+    saved_params = {k: _policy.PARAMS[k] for k in params if k in _policy.PARAMS} if params else {}
     if params:
         _policy.PARAMS.update(params)
+        # Restored just before returning: PARAMS is module-global process state and
+        # `evaluate(workers=1)` runs every episode in this same interpreter, so the next
+        # in-process episode would otherwise inherit this episode's parameters -- a holdout
+        # run placed after a candidate run silently evaluated the *incumbent* with the
+        # candidate's constants. (Pool workers > 1 fork per job and never see the mutation.)
+        # If the episode itself raises, the executor re-raises in the caller, so the
+        # failure is loud -- there is no silent leak on that path.
     mod = importlib.import_module(agent_mod)
     importlib.reload(mod)
     opp = BUILTIN_AGENTS[opp_name]
+
+    # REPLAY_MARKET_PRESSURE judges carry a working-capital floor (see replay_opp.py):
+    # the recorded opponents survive their d0-14 trough on a windfall the mirror world
+    # halves, and a bankrupt judge applies zero market pressure. The runner — never the
+    # agent, which the engine would not let mint money — tops the judge up to the floor
+    # each turn and reports the total, so calibration can price the subsidy honestly.
+    judge_meta = getattr(opp, "replay_meta", None)
+    subsidy = (judge_meta or {}).get("subsidy_floor", 0.0)
+    subsidy_given = 0.0
+    if subsidy:
+        _apply_units = env._apply_unit_actions
+
+        def apply_with_floor(pi, act):
+            nonlocal subsidy_given
+            if pi == 1:
+                f = env.farms[1]
+                if f.money < subsidy:
+                    subsidy_given += subsidy - f.money
+                    f.money = subsidy
+            return _apply_units(pi, act)
+
+        env._apply_unit_actions = apply_with_floor
 
     env = KaggricultureEnv(episode_steps=720, seed=seed)
     obs = env._obs()
@@ -136,11 +175,12 @@ def run_one(args):
     units_sold = defaultdict(int)
     _settle = env._settle_one_unit
 
-    def settle_one_unit(pi, resource, op):
+    def settle_one_unit(pi, resource, op, price=None):
         if pi == 0 and op == "SELL" and me.shed.get(resource, 0) > 0:
-            revenue[resource] += price_for(resource, env.market_inventory[resource])
+            revenue[resource] += (price if price is not None
+                                  else price_for(resource, env.market_inventory[resource]))
             units_sold[resource] += 1
-        return _settle(pi, resource, op)
+        return _settle(pi, resource, op, price)
 
     env._settle_one_unit = settle_one_unit
 
@@ -191,9 +231,15 @@ def run_one(args):
               if sold_units else 0.0)
 
     pol = getattr(mod, "_POLICIES", {}).get(0)
+    if params:
+        _policy.PARAMS.update(saved_params)
+        for k in params:
+            if k not in saved_params:
+                _policy.PARAMS.pop(k, None)
     return dict(
         seed=seed, opp=opp_name,
         bank=me.money, opp_bank=env.farms[1].money,
+        judge_subsidy=subsidy_given,
         tiles_per_day=tile_days / (SEASON_DAYS * TURNS_PER_DAY),
         weeds=weeds_seen, weed_peak=weed_peak,
         thirst=deaths["thirst"], thirst_units=deaths["thirst_units"], spent=deaths["spent"],
@@ -206,31 +252,39 @@ def run_one(args):
 
 
 def _fmt_group(name, rows):
+    def avg(key):
+        vals = [r[key] for r in rows if r.get(key) is not None]
+        return (sum(vals) / len(vals)) if vals else None
+
+    def fmt(key, scale=1.0, prec=1, suffix=""):
+        v = avg(key)
+        return ("-" if v is None else f"{v * scale:.{prec}f}{suffix}")
+
     n = len(rows)
     bank = sorted(r["bank"] for r in rows)
     mean = sum(bank) / n
     wins = sum(1 for r in rows if r["bank"] > r["opp_bank"])
     errs = [(r["seed"], r["err"]) for r in rows if r["err"]]
     return ("vs %-10s n=%-3d  bank mean $%8.0f  p10 $%8.0f  min $%8.0f  max $%8.0f | "
-            "win %d/%d | tiles/day %5.1f  thirst %4.1f (%4.1fu)  spent %4.1f  lost %4.1f  "
-            "idle %4.1f%%  px %5.1f%% | worst %5.1fms over %d%s"
+            "win %d/%d | tiles/day %5s  thirst %5s (%5s)  spent %5s  lost %5s  "
+            "idle %6s  px %6s | worst %5.1fms over %d%s"
             % (name, n, mean, bank[max(0, int(0.1 * n) - 1)], bank[0], bank[-1], wins, n,
-               sum(r["tiles_per_day"] for r in rows) / n,
-               sum(r["thirst"] for r in rows) / n,
-               sum(r["thirst_units"] for r in rows) / n,
-               sum(r["spent"] for r in rows) / n,
-               sum(r["lost"] for r in rows) / n,
-               100.0 * sum(r["idle_frac"] for r in rows) / n,
-               100.0 * sum(r["px_all"] for r in rows) / n,
+               fmt("tiles_per_day"),
+               fmt("thirst"), fmt("thirst_units"),
+               fmt("spent"), fmt("lost"),
+               fmt("idle_frac", 100.0, 1, "%"),
+               fmt("px_all", 100.0, 1, "%"),
                max(r["worst_ms"] for r in rows),
                sum(r["over_budget"] for r in rows),
                ("  ERR %s" % errs[:2]) if errs else ""))
 
 
-def evaluate(seeds, opps, agent_mod="main", workers=None, quiet=False, params=None):
-    jobs = [(s, o, agent_mod, params) for o in opps for s in seeds]
+def evaluate(seeds, opps, agent_mod="main", workers=None, quiet=False, params=None, engine="mirror"):
+    jobs = [(s, o, agent_mod, params, engine) for o in opps for s in seeds]
     t0 = time.monotonic()
     workers = workers or min(os.cpu_count() or 4, 16)
+    if engine == "real":
+        workers = 1  # the vendored engine module is process-global state; no pool
     if workers <= 1:
         rows = [run_one(j) for j in jobs]
     else:
@@ -268,8 +322,10 @@ def main_cli():
     ap.add_argument("--opps", default="starter,heuristic,random")
     ap.add_argument("--agent", default="main")
     ap.add_argument("--workers", type=int, default=0)
+    ap.add_argument("--engine", choices=("mirror", "real"), default="mirror",
+                    help="mirror = engine.py screening tier; real = vendored pinned engine")
     a = ap.parse_args()
-    evaluate(range(a.seeds), a.opps.split(","), a.agent, a.workers or None)
+    evaluate(range(a.seeds), a.opps.split(","), a.agent, a.workers or None, engine=a.engine)
 
 
 if __name__ == "__main__":
