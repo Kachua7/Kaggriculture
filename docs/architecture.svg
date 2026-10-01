@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 1060" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b949e"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2ea44f"/>
+    </marker>
+  </defs>
+
+  <!-- background -->
+  <rect width="960" height="1060" fill="#0d1117"/>
+  <text x="480" y="42" text-anchor="middle" fill="#e6edf3" font-size="22" font-weight="bold">kagfarm decision pipeline</text>
+
+  <!-- 1 Observation -->
+  <rect x="330" y="64" width="300" height="54" rx="8" fill="#161b22" stroke="#8b949e"/>
+  <text x="480" y="86" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="bold">Observation</text>
+  <text x="480" y="106" text-anchor="middle" fill="#8b949e" font-size="11">public episode state, turn t</text>
+
+  <line x1="480" y1="118" x2="480" y2="148" stroke="#8b949e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- 2 WorldState -->
+  <rect x="270" y="152" width="420" height="96" rx="8" fill="#161b22" stroke="#58a6ff"/>
+  <text x="480" y="176" text-anchor="middle" fill="#58a6ff" font-size="15" font-weight="bold">WorldState</text>
+  <text x="480" y="196" text-anchor="middle" fill="#8b949e" font-size="11">cash · roster · positions · shed · market</text>
+  <text x="480" y="214" text-anchor="middle" fill="#8b949e" font-size="11">FutureSupply[g][t] · ServiceLoad[t] · slack</text>
+  <text x="480" y="232" text-anchor="middle" fill="#8b949e" font-size="11">one canonical snapshot, one source of truth</text>
+
+  <line x1="480" y1="248" x2="480" y2="278" stroke="#8b949e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- 3 Opponent inference -->
+  <rect x="300" y="282" width="360" height="72" rx="8" fill="#161b22" stroke="#8b949e"/>
+  <text x="480" y="306" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="bold">Opponent inference</text>
+  <text x="480" y="326" text-anchor="middle" fill="#8b949e" font-size="11">behavioral phenotype posterior from public state</text>
+  <text x="480" y="344" text-anchor="middle" fill="#8b949e" font-size="11">MILK/WOOL p10 · p50 · p90 arrival waves</text>
+
+  <line x1="480" y1="354" x2="480" y2="384" stroke="#8b949e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- 4 Strategy zoo -->
+  <rect x="240" y="388" width="480" height="118" rx="8" fill="#161b22" stroke="#bc8cff"/>
+  <text x="480" y="412" text-anchor="middle" fill="#bc8cff" font-size="15" font-weight="bold">Strategy zoo (E0–E8)</text>
+  <text x="480" y="432" text-anchor="middle" fill="#8b949e" font-size="11">E0 elite prior · E1 livestock lean · E2 balanced · E3 wool recovery</text>
+  <text x="480" y="450" text-anchor="middle" fill="#8b949e" font-size="11">E4 strawberry · E5 tomato/shop · E6 crop staple · E7 anti-livestock · E8 liquidity</text>
+  <text x="480" y="472" text-anchor="middle" fill="#8b949e" font-size="11">each = parameter overlay on one shared executor</text>
+  <text x="480" y="492" text-anchor="middle" fill="#8b949e" font-size="11">scored by projected terminal value, risk-adjusted</text>
+
+  <line x1="480" y1="506" x2="480" y2="536" stroke="#8b949e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- 5 Selector -->
+  <rect x="270" y="540" width="420" height="96" rx="8" fill="#161b22" stroke="#d29922"/>
+  <text x="480" y="564" text-anchor="middle" fill="#d29922" font-size="15" font-weight="bold">Runtime strategy selector</text>
+  <text x="480" y="584" text-anchor="middle" fill="#8b949e" font-size="11">commits one expert per macro window</text>
+  <text x="480" y="602" text-anchor="middle" fill="#8b949e" font-size="11">d0 · d3 · d6 · d9 · d12 · d16 · d20 · d24</text>
+  <text x="480" y="620" text-anchor="middle" fill="#8b949e" font-size="11">danger triggers: service deficit · herd collapse · price shock</text>
+
+  <!-- feedback loop: phenotype feeds selector -->
+  <path d="M 480 354 C 700 380, 760 480, 700 560 C 680 590, 660 596, 694 588" fill="none" stroke="#bc8cff" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arr)"/>
+  <text x="762" y="470" fill="#bc8cff" font-size="11" text-anchor="middle">phenotype</text>
+  <text x="762" y="486" fill="#bc8cff" font-size="11" text-anchor="middle">conditions</text>
+
+  <line x1="480" y1="636" x2="480" y2="666" stroke="#8b949e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- 6 Task planner -->
+  <rect x="330" y="670" width="300" height="54" rx="8" fill="#161b22" stroke="#8b949e"/>
+  <text x="480" y="692" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="bold">Task planner</text>
+  <text x="480" y="712" text-anchor="middle" fill="#8b949e" font-size="11">portfolio: plant · buy · feed · expand · sell</text>
+
+  <line x1="480" y1="724" x2="480" y2="754" stroke="#8b949e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- 7 Scheduler -->
+  <rect x="300" y="758" width="360" height="72" rx="8" fill="#161b22" stroke="#8b949e"/>
+  <text x="480" y="782" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="bold">Worker scheduler</text>
+  <text x="480" y="802" text-anchor="middle" fill="#8b949e" font-size="11">serpentine allocation → deferred jobs</text>
+  <text x="480" y="820" text-anchor="middle" fill="#8b949e" font-size="11">→ global reassignment (cheapest marginal walk)</text>
+
+  <line x1="480" y1="830" x2="480" y2="860" stroke="#8b949e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- 8 Market optimizer -->
+  <rect x="280" y="864" width="400" height="72" rx="8" fill="#161b22" stroke="#2ea44f"/>
+  <text x="480" y="888" text-anchor="middle" fill="#2ea44f" font-size="15" font-weight="bold">Market-slot optimizer</text>
+  <text x="480" y="908" text-anchor="middle" fill="#8b949e" font-size="11">max Σ ΔV·x  s.t.  Σ slots ≤ 10, cash + inventory ≥ 0</text>
+  <text x="480" y="926" text-anchor="middle" fill="#8b949e" font-size="11">sells floored · survival orders constitutional</text>
+
+  <line x1="480" y1="936" x2="480" y2="966" stroke="#8b949e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- 9 Executor + feedback -->
+  <rect x="330" y="970" width="300" height="54" rx="8" fill="#161b22" stroke="#f85149"/>
+  <text x="480" y="992" text-anchor="middle" fill="#f85149" font-size="15" font-weight="bold">Deterministic executor</text>
+  <text x="480" y="1012" text-anchor="middle" fill="#8b949e" font-size="11">same state → same actions, every replay</text>
+
+  <!-- environment feedback -->
+  <path d="M 630 997 C 820 997, 880 900, 880 700 L 880 200 C 880 100, 760 91, 634 91" fill="none" stroke="#2ea44f" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrG)"/>
+  <text x="908" y="560" fill="#2ea44f" font-size="12" text-anchor="middle" transform="rotate(90 908 560)">environment → next observation</text>
+</svg>
