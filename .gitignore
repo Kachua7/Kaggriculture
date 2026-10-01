@@ -8,6 +8,14 @@ __pycache__/
 calibration/real_engine/
 calibration/truth.json
 calibration/versions.txt
+# the vendored interpreter dirs are content-pinned copies of Kaggle's engine for local
+# confirmation runs; diff/verify against MANIFEST.sha256 instead of committing them
+# (snapshot.sh runs `git add -A`, so these MUST stay ignored)
+calibration/engine/
+calibration/engine-1.32.2/
+# ...but the pins that make the vendoring auditable are ours:
+!calibration/engine/MANIFEST.sha256
+!calibration/engine-1.32.2/MANIFEST.sha256
 
 # eval + sweep output
 artifacts/
@@ -19,6 +27,24 @@ submission.tar.gz
 # package commit is the record of what was submitted, not this file.
 submission/
 
+# delivery tarballs: regenerable by `bash pack.sh` from the committed sources
+submission*.tar.gz
+rpidle_candidate.tar.gz
+rw1_candidate.tar.gz
+
+# competition replay data (Kaggle's, multi-GB): re-fetchable via
+# analysis/restore_replays.py from the official kaggriculture-episodes-* datasets
+majkel1337games/
+sub10games/
+*games/
+analysis/replays/
+analysis/episodes_index/
+analysis/replay_location_map.json
+analysis/telemetry*/
+
+# one-shot consult transcripts (external advisory sessions, working notes, not code)
+analysis/nemo_*
+
 # secrets
 kaggle.json
 .env
@@ -26,3 +52,6 @@ kaggle.json
 # stray probe files from sandbox setup — safe to delete by hand
 .writetest
 .gittest/
+# parked files the 17 Sep submit-readiness review flagged as dead weight (moved, not
+# deleted, on the user's instruction)
+useless/
